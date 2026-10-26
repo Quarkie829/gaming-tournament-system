@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #0b0f19;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Rajdhani', 'Inter', sans-serif;
+    letter-spacing: 0.025em;
+  }
+}
+
+/* Custom glowing effects */
+.glow-blue {
+  box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.35);
+}
+
+.glow-purple {
+  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.35);
+}
+
+.card-gradient {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+  backdrop-filter: blur(12px);
+}
