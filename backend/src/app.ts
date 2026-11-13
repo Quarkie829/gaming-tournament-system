@@ -14,7 +14,7 @@ export const app = express();
 
 // Cross-Origin Resource Sharing
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: true, // Dynamically allow calling origin (localhost, GitHub Pages, Render, etc.)
   credentials: true
 }));
 

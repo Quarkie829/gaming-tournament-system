@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -31,7 +31,7 @@ import { AdminSponsorsPage } from './pages/admin/AdminSponsorsPage';
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <div className="flex flex-col min-h-screen bg-[#0a0e17] text-slate-100">
           <Navbar />
           <main className="flex-grow">
@@ -137,7 +137,7 @@ export const App: React.FC = () => {
           </main>
           <Footer />
         </div>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 };
