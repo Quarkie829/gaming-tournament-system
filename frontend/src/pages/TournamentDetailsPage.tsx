@@ -45,22 +45,36 @@ export const TournamentDetailsPage: React.FC = () => {
 
   const fetchDetails = async () => {
     if (!id) return;
+    const tournId = parseInt(id, 10);
+    if (isNaN(tournId)) return;
+
     try {
       setLoading(true);
-      const tournId = parseInt(id, 10);
-      const [tournRes, matchesRes, prizesRes, sponsorsRes] = await Promise.all([
-        tournamentsApi.getTournament(tournId),
+
+      // 1. Fetch primary tournament specification & rules
+      const tournRes = await tournamentsApi.getTournament(tournId);
+      if (tournRes?.tournament) {
+        setTournament(tournRes.tournament);
+        setRegistrations(tournRes.registrations || []);
+        setUserEligibility(tournRes.user_eligibility || null);
+      }
+
+      // 2. Fetch auxiliary module data safely (don't break tournament page if secondary module is empty)
+      const [matchesResult, prizesResult, sponsorsResult] = await Promise.allSettled([
         matchesApi.listMatches({ tournament_id: tournId }),
         financialApi.listPrizes({ tournament_id: tournId }),
         financialApi.listTournamentSponsors(tournId)
       ]);
 
-      setTournament(tournRes.tournament);
-      setRegistrations(tournRes.registrations);
-      setUserEligibility(tournRes.user_eligibility);
-      setMatches(matchesRes.matches);
-      setPrizes(prizesRes.prizes);
-      setSponsors(sponsorsRes.sponsors);
+      if (matchesResult.status === 'fulfilled') {
+        setMatches(matchesResult.value.matches || []);
+      }
+      if (prizesResult.status === 'fulfilled') {
+        setPrizes(prizesResult.value.prizes || []);
+      }
+      if (sponsorsResult.status === 'fulfilled') {
+        setSponsors(sponsorsResult.value.sponsors || []);
+      }
     } catch (err) {
       console.error('Failed to load tournament details:', err);
     } finally {

@@ -28,22 +28,22 @@ TRUNCATE TABLE Users;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Password for all seed users is 'Password123!'
--- Hashed using bcrypt (cost 10): $2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q
+-- Hashed using bcrypt (cost 10): $2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC
 
 -- 1. USERS
 INSERT INTO Users (user_id, username, email, password_hash, country, role, created_at) VALUES
-(1, 'admin', 'admin@tournament.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'India', 'admin', NOW()),
-(2, 'priyanshu', 'priyanshu@tournament.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'India', 'admin', NOW()),
-(3, 'shroud_jr', 'shroud@stream.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Canada', 'player', NOW()),
-(4, 'tenz_god', 'tenz@valorant.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Canada', 'player', NOW()),
-(5, 's1mple_king', 's1mple@cs2.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Ukraine', 'player', NOW()),
-(6, 'b1t_pro', 'b1t@cs2.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Ukraine', 'player', NOW()),
-(7, 'faker_legend', 'faker@t1.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'South Korea', 'player', NOW()),
-(8, 'keria_star', 'keria@t1.gg', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'South Korea', 'player', NOW()),
-(9, 'soloplayer1', 'solo1@gamer.com', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'India', 'player', NOW()),
-(10, 'soloplayer2', 'solo2@gamer.com', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'USA', 'player', NOW()),
-(11, 'soloplayer3', 'solo3@gamer.com', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Germany', 'player', NOW()),
-(12, 'soloplayer4', 'solo4@gamer.com', '$2a$10$zvGy0XX77lqxSwMybNw/butQuMm8WfgcO48QrNFlckzVHQ2nGUD.q', 'Japan', 'player', NOW());
+(1, 'admin', 'admin@tournament.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'India', 'admin', NOW()),
+(2, 'priyanshu', 'priyanshu@tournament.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'India', 'admin', NOW()),
+(3, 'shroud_jr', 'shroud@stream.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Canada', 'player', NOW()),
+(4, 'tenz_god', 'tenz@valorant.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Canada', 'player', NOW()),
+(5, 's1mple_king', 's1mple@cs2.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Ukraine', 'player', NOW()),
+(6, 'b1t_pro', 'b1t@cs2.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Ukraine', 'player', NOW()),
+(7, 'faker_legend', 'faker@t1.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'South Korea', 'player', NOW()),
+(8, 'keria_star', 'keria@t1.gg', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'South Korea', 'player', NOW()),
+(9, 'soloplayer1', 'solo1@gamer.com', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'India', 'player', NOW()),
+(10, 'soloplayer2', 'solo2@gamer.com', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'USA', 'player', NOW()),
+(11, 'soloplayer3', 'solo3@gamer.com', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Germany', 'player', NOW()),
+(12, 'soloplayer4', 'solo4@gamer.com', '$2a$10$0Jm2C2A2qjj0aedMja4LZO8UynNicU.jPTOmP0IuNj8mBOcbFZmfC', 'Japan', 'player', NOW());
 
 -- 2. GAMES
 INSERT INTO Games (game_id, game_name, genre, platform, publisher) VALUES
