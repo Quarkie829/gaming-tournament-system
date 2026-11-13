@@ -118,16 +118,40 @@ export async function getTournament(req: AuthenticatedRequest, res: Response, ne
         [userId]
       );
 
-      // Check which captained teams are already registered
-      const teamsWithStatus = captainedTeams.map((team) => {
-        const teamReg = registrations.find((r: any) => r.team_id === team.team_id && r.status !== 'Cancelled');
-        return {
-          ...team,
-          is_registered: !!teamReg,
-          registration_status: teamReg ? teamReg.status : null,
-          meets_size_requirement: team.member_count >= (tournament.team_size || 1)
-        };
-      });
+      // Check which captained teams are already registered or have player conflicts
+      const teamsWithStatus = await Promise.all(
+        captainedTeams.map(async (team) => {
+          const teamReg = registrations.find((r: any) => r.team_id === team.team_id && r.status !== 'Cancelled');
+
+          // Check if any member of this team is already registered under another team in this tournament
+          const conflictMembers: any[] = await query(
+            `SELECT u.username, t_other.team_name, r_other.status AS other_status
+             FROM TeamMembers tm_this
+             JOIN TeamMembers tm_other ON tm_other.user_id = tm_this.user_id AND tm_other.team_id != tm_this.team_id
+             JOIN Registrations r_other ON r_other.team_id = tm_other.team_id
+             JOIN Teams t_other ON t_other.team_id = tm_other.team_id
+             JOIN Users u ON u.user_id = tm_this.user_id
+             WHERE tm_this.team_id = ?
+               AND r_other.tournament_id = ?
+               AND r_other.status IN ('Approved', 'Pending')`,
+            [team.team_id, tournamentId]
+          );
+
+          const hasConflict = conflictMembers.length > 0;
+          const conflictMsg = hasConflict
+            ? `Player "${conflictMembers[0].username}" is already in this tournament with team "${conflictMembers[0].team_name}" (${conflictMembers[0].other_status}).`
+            : null;
+
+          return {
+            ...team,
+            is_registered: !!teamReg,
+            registration_status: teamReg ? teamReg.status : null,
+            meets_size_requirement: team.member_count >= (tournament.team_size || 1),
+            has_player_conflict: hasConflict,
+            conflict_message: conflictMsg
+          };
+        })
+      );
 
       const now = new Date();
       const deadline = new Date(tournament.registration_deadline);

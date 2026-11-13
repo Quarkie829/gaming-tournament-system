@@ -8,6 +8,23 @@ async function startServer() {
     // Verify database connectivity
     const connection = await pool.getConnection();
     console.log('Successfully connected to MySQL database: ' + (process.env.DB_NAME || 'gaming_tournament_db'));
+
+    // Ensure TeamJoinRequests table exists
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS TeamJoinRequests (
+        request_id INT AUTO_INCREMENT PRIMARY KEY,
+        team_id INT NOT NULL,
+        user_id INT NOT NULL,
+        type ENUM('Invitation', 'Request') NOT NULL,
+        member_role VARCHAR(50) NOT NULL DEFAULT 'Starter',
+        status ENUM('Pending', 'Accepted', 'Declined', 'Cancelled') NOT NULL DEFAULT 'Pending',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (team_id) REFERENCES Teams(team_id) ON UPDATE CASCADE ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+      ) ENGINE=InnoDB
+    `);
+
     connection.release();
 
     const server = app.listen(PORT, '0.0.0.0', () => {

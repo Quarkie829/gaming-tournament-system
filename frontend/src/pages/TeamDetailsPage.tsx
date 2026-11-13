@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { teamsApi } from '../api/teamsApi';
-import { Team, TeamMember, Registration } from '../types';
+import { Team, TeamMember, Registration, TeamJoinRequest } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 import {
@@ -16,7 +16,13 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
-  Trophy
+  Trophy,
+  Mail,
+  Send,
+  Clock,
+  UserCheck,
+  XCircle,
+  Check
 } from 'lucide-react';
 
 export const TeamDetailsPage: React.FC = () => {
@@ -28,11 +34,14 @@ export const TeamDetailsPage: React.FC = () => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [permissions, setPermissions] = useState<any>(null);
+  const [requests, setRequests] = useState<TeamJoinRequest[]>([]);
+  const [userRequest, setUserRequest] = useState<TeamJoinRequest | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Add Member State
+  // Add / Invite Member State
   const [addUsername, setAddUsername] = useState<string>('');
   const [addRole, setAddRole] = useState<string>('Starter');
+  const [inviteMode, setInviteMode] = useState<'invite' | 'direct'>('invite');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -45,6 +54,8 @@ export const TeamDetailsPage: React.FC = () => {
       setMembers(res.members);
       setRegistrations(res.registrations);
       setPermissions(res.user_permissions);
+      setRequests(res.requests || []);
+      setUserRequest(res.user_request || null);
     } catch (err: any) {
       console.error('Failed to load team:', err);
     } finally {
@@ -56,22 +67,59 @@ export const TeamDetailsPage: React.FC = () => {
     fetchTeamDetails();
   }, [id, user]);
 
-  const handleAddMember = async (e: React.FormEvent) => {
+  const handleInviteOrAddMember = async (e: React.FormEvent, mode: 'invite' | 'direct') => {
     e.preventDefault();
     if (!id || !addUsername.trim()) return;
 
     try {
       setActionLoading(true);
       setFeedbackMsg(null);
-      const res = await teamsApi.addMember(parseInt(id, 10), {
-        username: addUsername.trim(),
-        member_role: addRole
-      });
-      setFeedbackMsg({ type: 'success', text: res.message });
+      if (mode === 'invite') {
+        const res = await teamsApi.invitePlayer(parseInt(id, 10), {
+          username: addUsername.trim(),
+          member_role: addRole
+        });
+        setFeedbackMsg({ type: 'success', text: res.message });
+      } else {
+        const res = await teamsApi.addMember(parseInt(id, 10), {
+          username: addUsername.trim(),
+          member_role: addRole
+        });
+        setFeedbackMsg({ type: 'success', text: res.message });
+      }
       setAddUsername('');
       await fetchTeamDetails();
     } catch (err: any) {
-      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to add member.' });
+      setFeedbackMsg({ type: 'error', text: err.message || 'Action failed.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRequestToJoin = async () => {
+    if (!id) return;
+    try {
+      setActionLoading(true);
+      setFeedbackMsg(null);
+      const res = await teamsApi.requestToJoinTeam(parseInt(id, 10));
+      setFeedbackMsg({ type: 'success', text: res.message });
+      await fetchTeamDetails();
+    } catch (err: any) {
+      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to submit join request.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRespondToRequest = async (requestId: number, action: 'accept' | 'decline' | 'cancel') => {
+    try {
+      setActionLoading(true);
+      setFeedbackMsg(null);
+      const res = await teamsApi.respondToRequest(requestId, action);
+      setFeedbackMsg({ type: 'success', text: res.message });
+      await fetchTeamDetails();
+    } catch (err: any) {
+      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to update request.' });
     } finally {
       setActionLoading(false);
     }
@@ -329,6 +377,105 @@ export const TeamDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Team Join Requests & Invitations Queue (For Captains) */}
+          {isCaptain && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                    <Mail className="w-4 h-4 text-amber-400" />
+                    <span>Join Requests & Invitations Queue</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Review incoming join requests from players and monitor outgoing invitations
+                  </p>
+                </div>
+                <span className="text-xs text-slate-400 font-mono">
+                  {requests.filter((r) => r.status === 'Pending').length} pending
+                </span>
+              </div>
+
+              {requests.filter((r) => r.status === 'Pending').length === 0 ? (
+                <div className="text-center py-6 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                  No pending requests or outgoing invitations.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Incoming Requests from Players */}
+                  {requests
+                    .filter((r) => r.type === 'Request' && r.status === 'Pending')
+                    .map((reqItem) => (
+                      <div
+                        key={reqItem.request_id}
+                        className="p-3.5 rounded-xl bg-slate-800/60 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-xs text-white">{reqItem.username}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-500/30 font-medium">
+                              Requested to Join
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {reqItem.email} • {reqItem.country || 'Global'} • Requested on{' '}
+                            {new Date(reqItem.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 self-end sm:self-auto">
+                          <button
+                            onClick={() => handleRespondToRequest(reqItem.request_id, 'accept')}
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center space-x-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Accept</span>
+                          </button>
+                          <button
+                            onClick={() => handleRespondToRequest(reqItem.request_id, 'decline')}
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/30 transition-colors"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                  {/* Outgoing Invitations Sent to Players */}
+                  {requests
+                    .filter((r) => r.type === 'Invitation' && r.status === 'Pending')
+                    .map((invItem) => (
+                      <div
+                        key={invItem.request_id}
+                        className="p-3.5 rounded-xl bg-slate-800/40 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-xs text-white">{invItem.username}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-500/30 font-medium">
+                              Invited as {invItem.member_role}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            Invitation sent on {new Date(invItem.created_at).toLocaleDateString()} • Awaiting player acceptance
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRespondToRequest(invItem.request_id, 'cancel')}
+                          disabled={actionLoading}
+                          className="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors self-end sm:self-auto"
+                        >
+                          Cancel Invite
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tournament Registrations for this team */}
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
             <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
@@ -361,16 +508,52 @@ export const TeamDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Captain Controls (Add Member Form) */}
+        {/* Right Column: Captain Recruitment OR Player Join Controls */}
         <div className="lg:col-span-1 space-y-6">
           {isCaptain ? (
             <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
-              <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
-                <UserPlus className="w-4 h-4 text-blue-400" />
-                <span>Add Member to Roster</span>
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                  <UserPlus className="w-4 h-4 text-purple-400" />
+                  <span>Roster Recruitment</span>
+                </h3>
+              </div>
 
-              <form onSubmit={handleAddMember} className="space-y-4">
+              {/* Toggle mode: Invite vs Direct Add */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setInviteMode('invite')}
+                  className={`py-1.5 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-1 ${
+                    inviteMode === 'invite'
+                      ? 'bg-purple-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Send Invite</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteMode('direct')}
+                  className={`py-1.5 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-1 ${
+                    inviteMode === 'direct'
+                      ? 'bg-purple-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <UserCheck className="w-3 h-3" />
+                  <span>Direct Add</span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-slate-400">
+                {inviteMode === 'invite'
+                  ? 'Sends an invitation to the player. The player must accept before joining the roster.'
+                  : 'Directly enters the player into your team roster immediately.'}
+              </p>
+
+              <form onSubmit={(e) => handleInviteOrAddMember(e, inviteMode)} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                     Player Username
@@ -381,7 +564,7 @@ export const TeamDetailsPage: React.FC = () => {
                     value={addUsername}
                     onChange={(e) => setAddUsername(e.target.value)}
                     placeholder="Enter player's username..."
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">
                     e.g. s1mple_king, b1t_pro, soloplayer2, etc.
@@ -395,7 +578,7 @@ export const TeamDetailsPage: React.FC = () => {
                   <select
                     value={addRole}
                     onChange={(e) => setAddRole(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:border-purple-500"
                   >
                     <option value="Starter">Starter</option>
                     <option value="Substitute">Substitute</option>
@@ -406,18 +589,102 @@ export const TeamDetailsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading || !addUsername.trim()}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all shadow-md shadow-blue-600/20"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 transition-all shadow-md shadow-purple-600/20"
                 >
-                  {actionLoading ? 'Adding...' : 'Add Player'}
+                  {actionLoading
+                    ? 'Processing...'
+                    : inviteMode === 'invite'
+                    ? 'Send Team Invitation'
+                    : 'Add Player to Roster'}
                 </button>
               </form>
             </div>
+          ) : !isMember ? (
+            /* Player Join Request Controls for Non-Members */
+            <div className="space-y-4">
+              {userRequest && userRequest.status === 'Pending' ? (
+                userRequest.type === 'Request' ? (
+                  <div className="p-6 rounded-2xl bg-amber-950/40 border border-amber-500/40 space-y-3">
+                    <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+                      <Clock className="w-4 h-4" />
+                      <span>Join Request Pending</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Your request to join <strong>{team.team_name}</strong> was submitted on{' '}
+                      {new Date(userRequest.created_at).toLocaleDateString()}. Waiting for captain{' '}
+                      <strong>{team.captain_username}</strong> to review.
+                    </p>
+                    <button
+                      onClick={() => handleRespondToRequest(userRequest.request_id, 'cancel')}
+                      disabled={actionLoading}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/30 transition-colors"
+                    >
+                      {actionLoading ? 'Cancelling...' : 'Cancel Join Request'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-2xl bg-blue-950/50 border border-blue-500/40 space-y-3">
+                    <div className="flex items-center space-x-2 text-blue-400 font-bold text-sm">
+                      <Mail className="w-4 h-4" />
+                      <span>Team Invitation Received!</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Captain <strong>{team.captain_username}</strong> has invited you to join{' '}
+                      <strong>{team.team_name}</strong> as <strong>{userRequest.member_role}</strong>!
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => handleRespondToRequest(userRequest.request_id, 'accept')}
+                        disabled={actionLoading}
+                        className="py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-600/20"
+                      >
+                        Accept & Join
+                      </button>
+                      <button
+                        onClick={() => handleRespondToRequest(userRequest.request_id, 'decline')}
+                        disabled={actionLoading}
+                        className="py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center mx-auto">
+                    <UserPlus className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-bold text-white">Join this Team</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Interested in competing with <strong>{team.team_name}</strong>? Submit a join request directly to
+                    Captain <strong>{team.captain_username}</strong>.
+                  </p>
+                  {user ? (
+                    <button
+                      onClick={handleRequestToJoin}
+                      disabled={actionLoading}
+                      className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-purple-600 hover:bg-purple-500 transition-all shadow-lg shadow-purple-600/20"
+                    >
+                      {actionLoading ? 'Submitting...' : 'Request to Join Team'}
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="block w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 transition-all text-center"
+                    >
+                      Login to Request Join
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 text-center space-y-2">
-              <Shield className="w-8 h-8 text-slate-600 mx-auto" />
-              <h4 className="text-sm font-bold text-white">Captain Restricted</h4>
+              <Shield className="w-8 h-8 text-emerald-500 mx-auto" />
+              <h4 className="text-sm font-bold text-white">Active Team Member</h4>
               <p className="text-xs text-slate-400">
-                Only the team captain ({team.captain_username}) has permissions to add new members and configure roster roles.
+                You are currently an active member of this squad roster. Only Captain {team.captain_username} can configure team settings.
               </p>
             </div>
           )}

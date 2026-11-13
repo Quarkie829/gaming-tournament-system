@@ -261,23 +261,25 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   {teams.map((t) => {
                     const meetsSize = t.meets_size_requirement;
                     const isAlreadyReg = t.is_registered;
+                    const hasConflict = t.has_player_conflict;
+                    const isBlocked = isAlreadyReg || !meetsSize || hasConflict;
 
                     return (
                       <label
                         key={t.team_id}
-                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                           selectedTeamId === t.team_id
-                            ? 'bg-blue-950/60 border-blue-500 text-white'
-                            : isAlreadyReg || !meetsSize
+                            ? 'bg-blue-950/60 border-blue-500 text-white cursor-pointer'
+                            : isBlocked
                             ? 'bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 text-slate-200'
+                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 text-slate-200 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center space-x-3">
                           <input
                             type="radio"
                             name="teamSelect"
-                            disabled={isAlreadyReg || !meetsSize}
+                            disabled={isBlocked}
                             checked={selectedTeamId === t.team_id}
                             onChange={() => setSelectedTeamId(t.team_id)}
                             className="text-blue-600 focus:ring-blue-500"
@@ -287,6 +289,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                             <div className="text-[11px] text-slate-400">
                               Roster: {t.member_count} / {tournament.team_size || 5} players
                             </div>
+                            {hasConflict && t.conflict_message && (
+                              <div className="text-[10px] text-rose-400 font-medium mt-0.5">
+                                ⚠ {t.conflict_message}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -294,6 +301,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                           {isAlreadyReg ? (
                             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">
                               Already Entered
+                            </span>
+                          ) : hasConflict ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500/40 text-rose-300">
+                              Player Conflict
                             </span>
                           ) : !meetsSize ? (
                             <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/70 text-amber-400">

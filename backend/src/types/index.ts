@@ -237,3 +237,24 @@ export interface AuthTokenPayload {
   email: string;
   role: UserRole;
 }
+
+export type TeamRequestType = 'Invitation' | 'Request';
+export type TeamRequestStatus = 'Pending' | 'Accepted' | 'Declined' | 'Cancelled';
+
+export interface TeamJoinRequest {
+  request_id: number;
+  team_id: number;
+  user_id: number;
+  type: TeamRequestType;
+  member_role: string;
+  status: TeamRequestStatus;
+  created_at: string;
+  updated_at?: string;
+  // Metadata fields
+  team_name?: string;
+  captain_id?: number;
+  captain_username?: string;
+  username?: string;
+  email?: string;
+  country?: string;
+}

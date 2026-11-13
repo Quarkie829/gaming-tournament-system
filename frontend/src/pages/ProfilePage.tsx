@@ -5,7 +5,8 @@ import { authApi } from '../api/authApi';
 import { registrationsApi } from '../api/registrationsApi';
 import { matchesApi } from '../api/matchesApi';
 import { financialApi } from '../api/financialApi';
-import { Registration, Match, Payment, MatchDispute } from '../types';
+import { teamsApi } from '../api/teamsApi';
+import { Registration, Match, Payment, MatchDispute, TeamJoinRequest } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatINR } from '../utils/currency';
 import {
@@ -26,7 +27,10 @@ import {
   IndianRupee,
   Receipt,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Users,
+  Check,
+  Send
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
@@ -36,8 +40,12 @@ export const ProfilePage: React.FC = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [disputes, setDisputes] = useState<MatchDispute[]>([]);
+  const [invitations, setInvitations] = useState<TeamJoinRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<TeamJoinRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'registrations' | 'matches' | 'payments' | 'disputes'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'matches' | 'payments' | 'disputes' | 'team_invites'>('registrations');
+  const [teamActionLoading, setTeamActionLoading] = useState<boolean>(false);
+  const [teamFeedback, setTeamFeedback] = useState<string | null>(null);
 
   // Edit Profile Modal
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
@@ -62,12 +70,13 @@ export const ProfilePage: React.FC = () => {
     if (!user) return;
     try {
       setLoading(true);
-      const [userRes, regRes, matchRes, payRes, dispRes] = await Promise.all([
+      const [userRes, regRes, matchRes, payRes, dispRes, teamReqRes] = await Promise.all([
         authApi.getUserProfile(user.user_id),
         registrationsApi.getMyRegistrations(),
         matchesApi.listMatches(),
         financialApi.listPayments(),
-        matchesApi.listDisputes()
+        matchesApi.listDisputes(),
+        teamsApi.getMyRequests()
       ]);
 
       setProfileData(userRes);
@@ -75,6 +84,8 @@ export const ProfilePage: React.FC = () => {
       setRegistrations(userRegs);
       setPayments(payRes.payments);
       setDisputes(dispRes.disputes);
+      setInvitations(teamReqRes.invitations || []);
+      setSentRequests(teamReqRes.sent_requests || []);
 
       // Filter matches where user/user's team is participant
       const myRegIds = new Set(userRegs.map((r) => r.registration_id));
@@ -90,6 +101,21 @@ export const ProfilePage: React.FC = () => {
       console.error('Failed to load profile data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRespondToTeamRequest = async (requestId: number, action: 'accept' | 'decline' | 'cancel') => {
+    try {
+      setTeamActionLoading(true);
+      setTeamFeedback(null);
+      const res = await teamsApi.respondToRequest(requestId, action);
+      setTeamFeedback(res.message);
+      await fetchAllUserData();
+      await refreshUser();
+    } catch (err: any) {
+      setTeamFeedback(err.message || 'Action failed.');
+    } finally {
+      setTeamActionLoading(false);
     }
   };
 
@@ -289,6 +315,23 @@ export const ProfilePage: React.FC = () => {
             >
               <AlertTriangle className="w-4 h-4" />
               <span>My Disputes ({disputes.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('team_invites')}
+              className={`pb-3 text-sm font-semibold transition-colors flex items-center space-x-2 border-b-2 whitespace-nowrap ${
+                activeTab === 'team_invites'
+                  ? 'border-purple-500 text-purple-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Team Invites & Requests</span>
+              {invitations.filter((i) => i.status === 'Pending').length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500 text-white">
+                  {invitations.filter((i) => i.status === 'Pending').length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -601,6 +644,183 @@ export const ProfilePage: React.FC = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 5: TEAM INVITATIONS & REQUESTS */}
+          {activeTab === 'team_invites' && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-6">
+              <div>
+                <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <span>Team Invites & Join Requests</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Accept or decline invitations sent by team captains, and track your pending join requests.
+                </p>
+              </div>
+
+              {teamFeedback && (
+                <div className="p-3 rounded-xl bg-purple-950/60 border border-purple-500/30 text-xs text-purple-300 flex items-center justify-between">
+                  <span>{teamFeedback}</span>
+                  <button onClick={() => setTeamFeedback(null)} className="text-purple-400 hover:text-white">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Sub-section 1: Invitations from Captains */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Send className="w-3.5 h-3.5 text-blue-400 rotate-180" />
+                    <span>Invitations Received ({invitations.length})</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    {invitations.filter((i) => i.status === 'Pending').length} awaiting response
+                  </span>
+                </div>
+
+                {invitations.length === 0 ? (
+                  <div className="text-center py-8 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                    No team invitations received yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {invitations.map((inv) => (
+                      <div
+                        key={inv.request_id}
+                        className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <Link
+                              to={`/teams/${inv.team_id}`}
+                              className="font-bold text-sm text-white hover:text-blue-400 transition-colors flex items-center space-x-1"
+                            >
+                              <span>{inv.team_name}</span>
+                              <ExternalLink className="w-3 h-3 text-slate-400" />
+                            </Link>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-950/80 text-purple-300 border border-purple-500/30">
+                              Role: {inv.member_role}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                inv.status === 'Pending'
+                                  ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
+                                  : inv.status === 'Accepted'
+                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+                                  : inv.status === 'Declined'
+                                  ? 'bg-rose-950/60 text-rose-400 border border-rose-500/30'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              {inv.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-1 flex items-center space-x-3">
+                            <span>Captain: <strong className="text-slate-300">{inv.captain_username || 'Captain'}</strong></span>
+                            <span>•</span>
+                            <span>Invited: {new Date(inv.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        {inv.status === 'Pending' && (
+                          <div className="flex items-center space-x-2 self-end sm:self-auto">
+                            <button
+                              onClick={() => handleRespondToTeamRequest(inv.request_id, 'accept')}
+                              disabled={teamActionLoading}
+                              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center space-x-1.5 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Accept & Join</span>
+                            </button>
+                            <button
+                              onClick={() => handleRespondToTeamRequest(inv.request_id, 'decline')}
+                              disabled={teamActionLoading}
+                              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition-colors disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Decline</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Sub-section 2: Sent Requests by User */}
+              <div className="space-y-3 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Send className="w-3.5 h-3.5 text-purple-400" />
+                    <span>My Sent Join Requests ({sentRequests.length})</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    {sentRequests.filter((r) => r.status === 'Pending').length} pending captain review
+                  </span>
+                </div>
+
+                {sentRequests.length === 0 ? (
+                  <div className="text-center py-8 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                    You have not sent any team join requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {sentRequests.map((req) => (
+                      <div
+                        key={req.request_id}
+                        className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <Link
+                              to={`/teams/${req.team_id}`}
+                              className="font-bold text-sm text-white hover:text-purple-400 transition-colors flex items-center space-x-1"
+                            >
+                              <span>{req.team_name}</span>
+                              <ExternalLink className="w-3 h-3 text-slate-400" />
+                            </Link>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                              Applied as: {req.member_role}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                req.status === 'Pending'
+                                  ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
+                                  : req.status === 'Accepted'
+                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+                                  : req.status === 'Declined'
+                                  ? 'bg-rose-950/60 text-rose-400 border border-rose-500/30'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              {req.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-1 flex items-center space-x-3">
+                            <span>Captain: <strong className="text-slate-300">{req.captain_username || 'Captain'}</strong></span>
+                            <span>•</span>
+                            <span>Requested: {new Date(req.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        {req.status === 'Pending' && (
+                          <button
+                            onClick={() => handleRespondToTeamRequest(req.request_id, 'cancel')}
+                            disabled={teamActionLoading}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 border border-slate-700 hover:border-rose-500/30 transition-colors self-end sm:self-auto disabled:opacity-50"
+                          >
+                            Cancel Request
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

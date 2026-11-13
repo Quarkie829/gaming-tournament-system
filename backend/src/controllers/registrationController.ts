@@ -265,6 +265,29 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
         }
       }
 
+      // 7B. Enforce single-team tournament rule: verify no player on this roster is already entered under another team
+      const [conflictingPlayers]: any = await conn.execute(
+        `SELECT tm_this.user_id, u.username, t_other.team_name, r_other.status AS reg_status
+         FROM TeamMembers tm_this
+         JOIN TeamMembers tm_other ON tm_other.user_id = tm_this.user_id AND tm_other.team_id != tm_this.team_id
+         JOIN Registrations r_other ON r_other.team_id = tm_other.team_id
+         JOIN Teams t_other ON t_other.team_id = tm_other.team_id
+         JOIN Users u ON u.user_id = tm_this.user_id
+         WHERE tm_this.team_id = ?
+           AND r_other.tournament_id = ?
+           AND r_other.status IN ('Approved', 'Pending')`,
+        [teamId, tournamentId]
+      );
+
+      if (conflictingPlayers.length > 0) {
+        const p = conflictingPlayers[0];
+        const error: any = new Error(
+          `Cannot register team: Player "${p.username}" is already participating in this tournament with team "${p.team_name}" (Status: ${p.reg_status}). A player cannot participate under multiple teams in the same tournament.`
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
       // 8. Check capacity limit
       const [countResult]: any = await conn.execute(
         `SELECT COUNT(*) AS active_count
