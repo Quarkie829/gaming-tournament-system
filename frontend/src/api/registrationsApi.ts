@@ -26,6 +26,15 @@ export const registrationsApi = {
     return res.data;
   },
 
+  listRegistrations: async (params?: {
+    tournament_id?: number;
+    status?: string;
+    type?: 'Solo' | 'Team';
+  }): Promise<{ success: boolean; count: number; registrations: Registration[] }> => {
+    const res = await apiClient.get('/registrations', { params });
+    return res.data;
+  },
+
   updateStatus: async (registrationId: number, status: string): Promise<{ success: boolean; message: string }> => {
     const res = await apiClient.patch(`/registrations/${registrationId}/status`, { status });
     return res.data;

@@ -12,6 +12,8 @@ DELIMITER $$
 DROP TRIGGER IF EXISTS trg_before_insert_registration$$
 DROP TRIGGER IF EXISTS trg_before_update_registration$$
 DROP TRIGGER IF EXISTS trg_before_insert_match_participant$$
+DROP TRIGGER IF EXISTS trg_before_insert_prize$$
+DROP TRIGGER IF EXISTS trg_before_update_prize$$
 
 -- TRIGGER 1: Check registration deadline, status, participation type, and max participants
 CREATE TRIGGER trg_before_insert_registration
@@ -119,6 +121,39 @@ BEGIN
     IF v_match_tournament <> v_reg_tournament THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Cross-tournament violation: Participant registration belongs to a different tournament.';
+    END IF;
+END$$
+
+-- TRIGGER 4: Enforce that awarded registration for a prize belongs to the tournament offering the prize
+CREATE TRIGGER trg_before_insert_prize
+BEFORE INSERT ON Prizes
+FOR EACH ROW
+BEGIN
+    DECLARE v_reg_tournament INT;
+    IF NEW.awarded_registration_id IS NOT NULL THEN
+        SELECT tournament_id INTO v_reg_tournament
+        FROM Registrations WHERE registration_id = NEW.awarded_registration_id;
+
+        IF v_reg_tournament IS NULL OR v_reg_tournament <> NEW.tournament_id THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Cross-tournament violation: Awarded registration belongs to a different tournament.';
+        END IF;
+    END IF;
+END$$
+
+CREATE TRIGGER trg_before_update_prize
+BEFORE UPDATE ON Prizes
+FOR EACH ROW
+BEGIN
+    DECLARE v_reg_tournament INT;
+    IF NEW.awarded_registration_id IS NOT NULL THEN
+        SELECT tournament_id INTO v_reg_tournament
+        FROM Registrations WHERE registration_id = NEW.awarded_registration_id;
+
+        IF v_reg_tournament IS NULL OR v_reg_tournament <> NEW.tournament_id THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Cross-tournament violation: Awarded registration belongs to a different tournament.';
+        END IF;
     END IF;
 END$$
 

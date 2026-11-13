@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/authApi';
 import { registrationsApi } from '../api/registrationsApi';
-import { Registration, User } from '../types';
+import { matchesApi } from '../api/matchesApi';
+import { financialApi } from '../api/financialApi';
+import { Registration, Match, Payment, MatchDispute } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
+import { formatINR } from '../utils/currency';
 import {
   User as UserIcon,
   Mail,
@@ -15,16 +19,26 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  Ban
+  Swords,
+  CreditCard,
+  AlertTriangle,
+  ExternalLink,
+  IndianRupee,
+  Receipt,
+  Clock
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [profileData, setProfileData] = useState<any>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [disputes, setDisputes] = useState<MatchDispute[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<'registrations' | 'matches' | 'payments' | 'disputes'>('registrations');
 
-  // Edit Modal State
+  // Edit Profile Modal
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
   const [editUsername, setEditUsername] = useState<string>('');
   const [editEmail, setEditEmail] = useState<string>('');
@@ -34,16 +48,39 @@ export const ProfilePage: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
 
-  const fetchProfileAndRegistrations = async () => {
+  // Pay Entry Fee Modal
+  const [payModalOpen, setPayModalOpen] = useState<boolean>(false);
+  const [targetRegistration, setTargetRegistration] = useState<Registration | null>(null);
+  const [payMethod, setPayMethod] = useState<string>('UPI');
+  const [payRef, setPayRef] = useState<string>('');
+  const [payLoading, setPayLoading] = useState<boolean>(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState<string | null>(null);
+
+  const fetchAllUserData = async () => {
     if (!user) return;
     try {
       setLoading(true);
-      const [userRes, regRes] = await Promise.all([
+      const [userRes, regRes, matchRes, payRes, dispRes] = await Promise.all([
         authApi.getUserProfile(user.user_id),
-        registrationsApi.getMyRegistrations()
+        registrationsApi.getMyRegistrations(),
+        matchesApi.listMatches(),
+        financialApi.listPayments(),
+        matchesApi.listDisputes()
       ]);
+
       setProfileData(userRes);
-      setRegistrations(regRes.registrations);
+      const userRegs = regRes.registrations;
+      setRegistrations(userRegs);
+      setPayments(payRes.payments);
+      setDisputes(dispRes.disputes);
+
+      // Filter matches where user/user's team is participant
+      const myRegIds = new Set(userRegs.map((r) => r.registration_id));
+      const myMatches = matchRes.matches.filter((m) =>
+        (m.participants || []).some((p) => myRegIds.has(p.registration_id))
+      );
+      setMatches(myMatches);
 
       setEditUsername(userRes.user.username);
       setEditEmail(userRes.user.email);
@@ -56,7 +93,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchProfileAndRegistrations();
+    fetchAllUserData();
   }, [user]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -74,7 +111,7 @@ export const ProfilePage: React.FC = () => {
       });
       setEditSuccess('Profile updated successfully!');
       await refreshUser();
-      await fetchProfileAndRegistrations();
+      await fetchAllUserData();
       setTimeout(() => {
         setEditModalOpen(false);
         setEditSuccess(null);
@@ -90,9 +127,45 @@ export const ProfilePage: React.FC = () => {
     if (!window.confirm('Are you sure you want to cancel this registration?')) return;
     try {
       await registrationsApi.cancelRegistration(registrationId);
-      await fetchProfileAndRegistrations();
+      await fetchAllUserData();
     } catch (err: any) {
       alert(err.message || 'Failed to cancel registration.');
+    }
+  };
+
+  const handleOpenPayModal = (reg: Registration) => {
+    setTargetRegistration(reg);
+    setPayMethod('UPI');
+    setPayRef(`TXN-INR-${Date.now().toString().slice(-6)}`);
+    setPayError(null);
+    setPaySuccess(null);
+    setPayModalOpen(true);
+  };
+
+  const handlePayEntryFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetRegistration) return;
+
+    try {
+      setPayLoading(true);
+      setPayError(null);
+      const fee = Number(targetRegistration.entry_fee) || 0;
+      await financialApi.createPayment({
+        registration_id: targetRegistration.registration_id,
+        amount: fee,
+        payment_method: payMethod,
+        transaction_reference: payRef.trim() || undefined
+      });
+      setPaySuccess('Entry fee paid successfully in Indian Rupees (₹)!');
+      await fetchAllUserData();
+      setTimeout(() => {
+        setPayModalOpen(false);
+        setPaySuccess(null);
+      }, 1400);
+    } catch (err: any) {
+      setPayError(err.message || 'Failed to process payment.');
+    } finally {
+      setPayLoading(false);
     }
   };
 
@@ -100,16 +173,21 @@ export const ProfilePage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-sm text-slate-400">Loading user profile & registrations...</p>
+        <p className="text-sm text-slate-400">Loading user profile, matches & financial records...</p>
       </div>
     );
   }
 
   const currentUser = profileData?.user || user;
 
+  // Set of registration IDs that have successful payments
+  const paidRegIds = new Set(
+    payments.filter((p) => p.payment_status === 'Success').map((p) => p.registration_id)
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Profile Header */}
+      {/* Profile Header Card */}
       <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center space-x-5">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-heading font-bold text-2xl uppercase shadow-xl shadow-blue-600/20">
@@ -158,93 +236,370 @@ export const ProfilePage: React.FC = () => {
         </button>
       </div>
 
-      {/* Grid: Registrations & Teams */}
+      {/* Main Player Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: My Registrations (2 cols) */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
-                  <Trophy className="w-4 h-4 text-blue-400" />
-                  <span>My Tournament Registrations (Module 4)</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Track approved, pending, and previous entries with live status history
-                </p>
+        {/* Left Column: Player Hub Tabs (2 Cols) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Tabs Navigation */}
+          <div className="flex border-b border-slate-800 space-x-6 overflow-x-auto pb-1">
+            <button
+              onClick={() => setActiveTab('registrations')}
+              className={`pb-3 text-sm font-semibold transition-colors flex items-center space-x-2 border-b-2 whitespace-nowrap ${
+                activeTab === 'registrations'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Trophy className="w-4 h-4" />
+              <span>Registrations ({registrations.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('matches')}
+              className={`pb-3 text-sm font-semibold transition-colors flex items-center space-x-2 border-b-2 whitespace-nowrap ${
+                activeTab === 'matches'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Swords className="w-4 h-4" />
+              <span>My Matches ({matches.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`pb-3 text-sm font-semibold transition-colors flex items-center space-x-2 border-b-2 whitespace-nowrap ${
+                activeTab === 'payments'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Payment History ({payments.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('disputes')}
+              className={`pb-3 text-sm font-semibold transition-colors flex items-center space-x-2 border-b-2 whitespace-nowrap ${
+                activeTab === 'disputes'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              <span>My Disputes ({disputes.length})</span>
+            </button>
+          </div>
+
+          {/* TAB 1: REGISTRATIONS */}
+          {activeTab === 'registrations' && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                    <Trophy className="w-4 h-4 text-blue-400" />
+                    <span>Tournament Registrations (Module 4)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Track approved, pending, and fee payment statuses in Indian Rupees (₹)
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-slate-400 font-mono">
-                {registrations.length} record(s)
-              </span>
+
+              {registrations.length === 0 ? (
+                <div className="text-center py-10 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                  You have not registered for any tournaments yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="px-4 py-3 rounded-l-lg">Tournament</th>
+                        <th className="px-4 py-3">Entrant</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Fee & Payment</th>
+                        <th className="px-4 py-3 rounded-r-lg text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {registrations.map((r) => {
+                        const isSolo = r.user_id !== null;
+                        const fee = Number(r.entry_fee) || 0;
+                        const hasPaid = paidRegIds.has(r.registration_id);
+
+                        return (
+                          <tr key={r.registration_id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-white">{r.tournament_title}</div>
+                              <div className="text-[10px] text-slate-500">
+                                Game: {r.game_name} • Reg #{r.registration_id}
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-3">
+                              {isSolo ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
+                                  Solo Entry
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-500/20 text-[10px] font-semibold">
+                                  Team: {r.team_name}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <StatusBadge status={r.status} />
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <div className="font-mono font-bold text-slate-200">
+                                {formatINR(fee, { showFreeForZero: true })}
+                              </div>
+                              {fee > 0 && (
+                                <div className="mt-0.5">
+                                  {hasPaid ? (
+                                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center space-x-1">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Paid (INR)</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleOpenPayModal(r)}
+                                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 uppercase underline"
+                                    >
+                                      Pay Now (₹)
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3 text-right">
+                              {r.status !== 'Cancelled' && r.can_cancel && (
+                                <button
+                                  onClick={() => handleCancelRegistration(r.registration_id)}
+                                  className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                                  title="Cancel registration"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
+          )}
 
-            {registrations.length === 0 ? (
-              <div className="text-center py-10 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
-                You have not registered for any tournaments yet.
+          {/* TAB 2: MY MATCHES */}
+          {activeTab === 'matches' && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                    <Swords className="w-4 h-4 text-blue-400" />
+                    <span>My Scheduled Matches (Module 5)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Matches where you or your team are assigned to a competitive slot
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="px-4 py-3 rounded-l-lg">Tournament</th>
-                      <th className="px-4 py-3">Type / Entrant</th>
-                      <th className="px-4 py-3">Registered On</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 rounded-r-lg text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-300">
-                    {registrations.map((r) => {
-                      const isSolo = r.user_id !== null;
 
-                      return (
-                        <tr key={r.registration_id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="font-semibold text-white">{r.tournament_title}</div>
-                            <div className="text-[10px] text-slate-500">
-                              Game: {r.game_name} • Fee: ${Number(r.entry_fee || 0).toFixed(2)}
-                            </div>
+              {matches.length === 0 ? (
+                <div className="text-center py-10 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                  No matches currently scheduled for your approved entries.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {matches.map((m) => {
+                    const participants = m.participants || [];
+
+                    return (
+                      <div
+                        key={m.match_id}
+                        className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 hover:border-slate-600 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-400 border border-blue-500/20">
+                              {m.round_name} • Match #{m.match_number}
+                            </span>
+                            <StatusBadge status={m.status} />
+                          </div>
+                          <div className="font-bold text-white text-sm">{m.tournament_title}</div>
+                          <div className="flex items-center space-x-2 text-slate-400">
+                            <Clock className="w-3 h-3 text-slate-500" />
+                            <span>{new Date(m.scheduled_time).toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Participants VS Score */}
+                        <div className="flex items-center space-x-3 bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-800">
+                          {participants.length === 0 ? (
+                            <span className="text-slate-500 italic">Slots TBD</span>
+                          ) : (
+                            participants.map((p, idx) => (
+                              <React.Fragment key={p.registration_id}>
+                                {idx > 0 && <span className="text-slate-500 font-bold">vs</span>}
+                                <div className="text-center">
+                                  <div className="font-semibold text-white">{p.entrant_name}</div>
+                                  <div className="font-mono text-xs font-bold text-blue-400">
+                                    {p.score !== null && p.score !== undefined ? `${p.score} pts` : '—'}
+                                  </div>
+                                </div>
+                              </React.Fragment>
+                            ))
+                          )}
+                        </div>
+
+                        <Link
+                          to={`/matches/${m.match_id}`}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-center text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all flex items-center justify-center space-x-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Match Center</span>
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: PAYMENT HISTORY */}
+          {activeTab === 'payments' && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                    <Receipt className="w-4 h-4 text-emerald-400" />
+                    <span>Payment History & Receipts (INR ₹)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Audit log of tournament entry fee transactions
+                  </p>
+                </div>
+              </div>
+
+              {payments.length === 0 ? (
+                <div className="text-center py-10 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                  No payment records found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="px-4 py-3 rounded-l-lg">Txn Ref</th>
+                        <th className="px-4 py-3">Tournament</th>
+                        <th className="px-4 py-3">Amount (INR)</th>
+                        <th className="px-4 py-3">Method</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 rounded-r-lg text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {payments.map((p) => (
+                        <tr key={p.payment_id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3 font-mono font-bold text-white">
+                            {p.transaction_reference}
                           </td>
-                          <td className="px-4 py-3">
-                            {isSolo ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
-                                Solo Entry
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-500/20 text-[10px] font-semibold">
-                                Team: {r.team_name}
-                              </span>
-                            )}
+                          <td className="px-4 py-3 font-semibold text-slate-200">
+                            {p.tournament_title}
+                          </td>
+                          <td className="px-4 py-3 font-mono font-extrabold text-emerald-400 text-sm">
+                            {formatINR(p.amount)}
                           </td>
                           <td className="px-4 py-3 font-mono text-slate-400">
-                            {new Date(r.registration_date).toLocaleDateString()}
+                            {p.payment_method}
                           </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge status={r.status} />
+                          <td className="px-4 py-3 font-mono text-slate-400">
+                            {new Date(p.paid_at).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {r.status !== 'Cancelled' && r.can_cancel && (
-                              <button
-                                onClick={() => handleCancelRegistration(r.registration_id)}
-                                className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
-                                title="Cancel registration"
-                              >
-                                Cancel
-                              </button>
-                            )}
+                            <StatusBadge status={p.payment_status} />
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: MY DISPUTES */}
+          {activeTab === 'disputes' && (
+            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span>My Match Disputes (Module 5D)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Claims raised on match scores or rules violations
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
+
+              {disputes.length === 0 ? (
+                <div className="text-center py-10 rounded-xl bg-slate-800/30 border border-slate-800 text-slate-500 text-xs">
+                  No disputes raised.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {disputes.map((d) => (
+                    <div
+                      key={d.dispute_id}
+                      className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-500/20">
+                            Dispute #{d.dispute_id}
+                          </span>
+                          <StatusBadge status={d.status} />
+                          <span className="text-slate-400">
+                            {d.round_name} • Match #{d.match_number} ({d.tournament_title})
+                          </span>
+                        </div>
+                        <span className="font-mono text-slate-500">
+                          {new Date(d.raised_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900/80 p-3 rounded-lg text-slate-300">
+                        <strong className="text-slate-400 block mb-1">Claim:</strong>
+                        {d.reason}
+                      </div>
+
+                      <div className="flex justify-end pt-1">
+                        <Link
+                          to={`/matches/${d.match_id}`}
+                          className="text-blue-400 hover:text-blue-300 flex items-center space-x-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>View Match Center</span>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right Column: User's Teams (1 col) */}
+        {/* Right Column: User Teams & Information (1 Col) */}
         <div className="lg:col-span-1 space-y-6">
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
             <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
@@ -257,9 +612,10 @@ export const ProfilePage: React.FC = () => {
             ) : (
               <div className="space-y-2">
                 {profileData?.teams?.map((t: any) => (
-                  <div
+                  <Link
                     key={t.team_id}
-                    className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-between text-xs"
+                    to={`/teams/${t.team_id}`}
+                    className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 flex items-center justify-between text-xs transition-colors"
                   >
                     <div>
                       <div className="font-semibold text-white">{t.team_name}</div>
@@ -270,13 +626,108 @@ export const ProfilePage: React.FC = () => {
                         Captain
                       </span>
                     )}
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Pay Entry Fee Modal */}
+      {payModalOpen && targetRegistration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6 sm:p-8">
+            <button
+              onClick={() => setPayModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-lg font-bold font-heading text-white mb-1 flex items-center space-x-2">
+              <CreditCard className="w-5 h-5 text-emerald-400" />
+              <span>Pay Entry Fee (INR ₹)</span>
+            </h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Complete tournament registration entry fee payment in Indian Rupees.
+            </p>
+
+            {payError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>{payError}</span>
+              </div>
+            )}
+
+            {paySuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span>{paySuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePayEntryFee} className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 space-y-1">
+                <div className="text-xs text-slate-400">Tournament:</div>
+                <div className="font-bold text-white text-sm">{targetRegistration.tournament_title}</div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-700/60 mt-2 text-xs">
+                  <span className="text-slate-400 font-semibold">Total Fee Due:</span>
+                  <span className="font-heading font-extrabold text-base text-emerald-400">
+                    {formatINR(targetRegistration.entry_fee || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Payment Method
+                </label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="UPI">UPI (Google Pay, PhonePe, Paytm)</option>
+                  <option value="NetBanking">Net Banking (HDFC, SBI, ICICI, Axis)</option>
+                  <option value="Credit Card">Credit Card (Visa / Mastercard / RuPay)</option>
+                  <option value="Debit Card">Debit Card</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Transaction / UTR Reference
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={payRef}
+                  onChange={(e) => setPayRef(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setPayModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={payLoading}
+                  className="px-5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-all shadow-md shadow-emerald-600/20"
+                >
+                  {payLoading ? 'Processing...' : `Pay ${formatINR(targetRegistration.entry_fee || 0)}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Edit Profile Modal */}
       {editModalOpen && (

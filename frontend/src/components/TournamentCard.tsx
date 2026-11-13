@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Tournament } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { Calendar, Users, Trophy, DollarSign, ArrowRight } from 'lucide-react';
+import { formatINR } from '../utils/currency';
 
 interface TournamentCardProps {
   tournament: Tournament;
@@ -72,7 +73,7 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({ tournament }) =>
               Entry Fee
             </span>
             <span className="font-semibold text-emerald-400">
-              {Number(tournament.entry_fee) === 0 ? 'FREE' : `$${Number(tournament.entry_fee).toFixed(2)}`}
+              {formatINR(tournament.entry_fee, { showFreeForZero: true })}
             </span>
           </div>
         </div>

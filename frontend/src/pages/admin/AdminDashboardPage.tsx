@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { tournamentsApi } from '../../api/tournamentsApi';
+import { formatINR } from '../../utils/currency';
 import {
   Shield,
   Trophy,
@@ -10,7 +11,13 @@ import {
   Database,
   ArrowRight,
   Plus,
-  Gamepad2
+  Gamepad2,
+  Swords,
+  AlertTriangle,
+  CreditCard,
+  Building2,
+  IndianRupee,
+  ShieldAlert
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -51,13 +58,13 @@ export const AdminDashboardPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center space-x-2 text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2">
             <Shield className="w-4 h-4" />
-            <span>Administrator Control Center</span>
+            <span>Administrator Control Center • Modules 1–6</span>
           </div>
           <h1 className="font-heading text-3xl sm:text-4xl font-extrabold text-white">
             System Overview & Metrics
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time aggregates querying the relational MySQL database.
+            Real-time aggregates querying the relational MySQL database with all financial figures in Indian Rupees (₹).
           </p>
         </div>
 
@@ -65,76 +72,92 @@ export const AdminDashboardPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/admin/tournaments"
-            className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/20 transition-all flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/20 transition-all flex items-center space-x-1.5"
           >
             <Plus className="w-4 h-4" />
-            <span>Manage Tournaments</span>
+            <span>Tournaments</span>
           </Link>
           <Link
-            to="/admin/games"
-            className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all flex items-center space-x-1.5"
+            to="/admin/matches"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all flex items-center space-x-1.5"
           >
-            <Gamepad2 className="w-4 h-4" />
-            <span>Manage Games</span>
+            <Swords className="w-4 h-4" />
+            <span>Matches</span>
           </Link>
           <Link
             to="/admin/registrations"
-            className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 transition-all flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 transition-all flex items-center space-x-1.5"
           >
             <CheckCircle className="w-4 h-4" />
-            <span>Review Registrations ({m.pending_registrations || 0})</span>
+            <span>Registrations ({m.pending_registrations || 0})</span>
           </Link>
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Primary Metric Cards Grid (6 Modules) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
           <div className="text-xs text-slate-400 mb-1">Total Tournaments</div>
           <div className="font-heading text-3xl font-extrabold text-white">
             {m.total_tournaments || 0}
           </div>
-          <div className="text-[10px] text-blue-400 mt-1">{m.open_tournaments || 0} Open</div>
+          <div className="text-[10px] text-blue-400 mt-1">{m.open_tournaments || 0} Open for Registration</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">Registered Users</div>
+          <div className="text-xs text-slate-400 mb-1">Registered Users & Teams</div>
           <div className="font-heading text-3xl font-extrabold text-white">
-            {m.total_users || 0}
+            {m.total_users || 0} <span className="text-lg text-slate-500 font-normal">/ {m.total_teams || 0} tms</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">Users table</div>
+          <div className="text-[10px] text-purple-400 mt-1">Users & Teams tables</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">Total Teams</div>
-          <div className="font-heading text-3xl font-extrabold text-white">
-            {m.total_teams || 0}
+          <div className="text-xs text-slate-400 mb-1">Total Matches Scheduled</div>
+          <div className="font-heading text-3xl font-extrabold text-indigo-400">
+            {m.total_matches || 0}
           </div>
-          <div className="text-[10px] text-purple-400 mt-1">Teams & Rosters</div>
+          <div className="text-[10px] text-indigo-400 mt-1">Matches & MatchParticipants</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">Pending Review</div>
+          <div className="text-xs text-slate-400 mb-1">Open Disputes</div>
           <div className="font-heading text-3xl font-extrabold text-amber-400">
+            {m.open_disputes || 0}
+          </div>
+          <div className="text-[10px] text-amber-400 mt-1">Pending review & correction</div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+          <div className="text-xs text-slate-400 mb-1">Net Entry Fee Revenue</div>
+          <div className="font-heading text-2xl font-extrabold text-emerald-400">
+            {formatINR(m.total_revenue || 0)}
+          </div>
+          <div className="text-[10px] text-emerald-500 mt-1">Successful Payments in INR (₹)</div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+          <div className="text-xs text-slate-400 mb-1">Total Prize Pool Allocated</div>
+          <div className="font-heading text-2xl font-extrabold text-amber-400">
+            {formatINR(m.total_prize_pool || 0)}
+          </div>
+          <div className="text-[10px] text-amber-500 mt-1">Configured Prize Tiers in INR (₹)</div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+          <div className="text-xs text-slate-400 mb-1">Pending Review Queue</div>
+          <div className="font-heading text-3xl font-extrabold text-rose-400">
             {m.pending_registrations || 0}
           </div>
-          <div className="text-[10px] text-amber-500 mt-1">Awaiting approval</div>
+          <div className="text-[10px] text-rose-400 mt-1">{m.approved_registrations || 0} Approved entries</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">Approved Entries</div>
-          <div className="font-heading text-3xl font-extrabold text-emerald-400">
-            {m.approved_registrations || 0}
+          <div className="text-xs text-slate-400 mb-1">Sponsors & Brand Partners</div>
+          <div className="font-heading text-3xl font-extrabold text-purple-400">
+            {m.total_sponsors || 0}
           </div>
-          <div className="text-[10px] text-emerald-500 mt-1">Confirmed participants</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="text-xs text-slate-400 mb-1">Database Schema</div>
-          <div className="font-heading text-2xl font-extrabold text-indigo-400">
-            3NF
-          </div>
-          <div className="text-[10px] text-indigo-400 mt-1">16 Normalized Tables</div>
+          <div className="text-[10px] text-purple-400 mt-1">Sponsors & TournamentSponsors</div>
         </div>
       </div>
 
@@ -196,70 +219,189 @@ export const AdminDashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* Navigation Shortcut Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          to="/admin/tournaments"
-          className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-blue-500/50 transition-all group flex flex-col justify-between"
-        >
-          <div>
-            <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center mb-3">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <h4 className="font-heading text-lg font-bold text-white group-hover:text-blue-400 transition-colors mb-1">
-              Tournaments & Rules
-            </h4>
-            <p className="text-xs text-slate-400">
-              Create and edit tournaments, configure tournament formats, dates, deadlines, entry fees, and 1:1 TournamentRules.
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-blue-400">
-            <span>Manage Tournaments</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </Link>
+      {/* Navigation Shortcut Cards Across All 6 Modules */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">
+          Management Portals (Modules 1–6)
+        </h2>
 
-        <Link
-          to="/admin/registrations"
-          className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/50 transition-all group flex flex-col justify-between"
-        >
-          <div>
-            <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center mb-3">
-              <CheckCircle className="w-5 h-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Module 2: Tournaments */}
+          <Link
+            to="/admin/tournaments"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-blue-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center mb-3">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-blue-400 transition-colors mb-1">
+                Tournaments & Rules
+              </h4>
+              <p className="text-xs text-slate-400">
+                Formats, dates, deadlines, entry fees, and 1:1 TournamentRules.
+              </p>
             </div>
-            <h4 className="font-heading text-lg font-bold text-white group-hover:text-purple-400 transition-colors mb-1">
-              Registrations Review Queue
-            </h4>
-            <p className="text-xs text-slate-400">
-              Approve or reject participant registrations, view slot limits, and enforce eligibility checks.
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-purple-400">
-            <span>Review Queue</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </Link>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-blue-400">
+              <span>Manage Tournaments</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
 
-        <Link
-          to="/admin/games"
-          className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 transition-all group flex flex-col justify-between"
-        >
-          <div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center mb-3">
-              <Gamepad2 className="w-5 h-5" />
+          {/* Module 4: Registrations */}
+          <Link
+            to="/admin/registrations"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center mb-3">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-purple-400 transition-colors mb-1">
+                Registrations Queue
+              </h4>
+              <p className="text-xs text-slate-400">
+                Approve or reject participant registrations and view slot limits.
+              </p>
             </div>
-            <h4 className="font-heading text-lg font-bold text-white group-hover:text-emerald-400 transition-colors mb-1">
-              Games Catalog
-            </h4>
-            <p className="text-xs text-slate-400">
-              Add supported games, configure genre, platform, and publisher references for tournament hosting.
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
-            <span>Manage Games</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </Link>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-purple-400">
+              <span>Review Queue</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 5A & 5B: Matches */}
+          <Link
+            to="/admin/matches"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mb-3">
+                <Swords className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-indigo-400 transition-colors mb-1">
+                Matches & Brackets
+              </h4>
+              <p className="text-xs text-slate-400">
+                Schedule rounds, assign approved participants to slots, and track scores.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-indigo-400">
+              <span>Manage Matches</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 5D & 5E: Disputes */}
+          <Link
+            to="/admin/disputes"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-amber-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center mb-3">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-amber-400 transition-colors mb-1">
+                Disputes & Corrections
+              </h4>
+              <p className="text-xs text-slate-400">
+                Review player claims and log audited score corrections.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-amber-400">
+              <span>Manage Disputes</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 6A: Payments */}
+          <Link
+            to="/admin/payments"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center mb-3">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-emerald-400 transition-colors mb-1">
+                Payments & Ledger
+              </h4>
+              <p className="text-xs text-slate-400">
+                Audit entry fee collections in INR (₹), update statuses, and issue refunds.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
+              <span>Financial Ledger</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 6B: Prizes */}
+          <Link
+            to="/admin/prizes"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-amber-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center mb-3">
+                <Trophy className="w-5 h-5 text-amber-400" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-amber-400 transition-colors mb-1">
+                Prize Pools & Awards
+              </h4>
+              <p className="text-xs text-slate-400">
+                Configure placement rewards in INR (₹) and award champion registrations.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-amber-400">
+              <span>Prize Distribution</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 6C: Sponsors */}
+          <Link
+            to="/admin/sponsors"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center mb-3">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-purple-400 transition-colors mb-1">
+                Sponsors & Partners
+              </h4>
+              <p className="text-xs text-slate-400">
+                Maintain brand catalog and link sponsorship capital to tournaments.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-purple-400">
+              <span>Manage Sponsors</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Module 2: Games */}
+          <Link
+            to="/admin/games"
+            className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 transition-all group flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center mb-3">
+                <Gamepad2 className="w-5 h-5" />
+              </div>
+              <h4 className="font-heading text-base font-bold text-white group-hover:text-emerald-400 transition-colors mb-1">
+                Games Catalog
+              </h4>
+              <p className="text-xs text-slate-400">
+                Supported game titles, genres, platforms, and publisher metadata.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
+              <span>Manage Games</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -1,42 +1,64 @@
-# Gaming Tournament Management System
+# ArenaHQ — Gaming Tournament Management System
 
-A production-grade, full-stack esports tournament web application engineered according to the official **DBMS Project Specification**. The platform eliminates spreadsheet confusion by providing an auditable, normalized 3NF relational database on MySQL 8.0 with automated integrity checks, role-based access control, and unified solo/team registrations.
+A production-grade, full-stack esports tournament web application engineered according to the official **DBMS Project Specification**. ArenaHQ eliminates spreadsheet confusion by providing an auditable, normalized 3NF relational database on MySQL 8.0 with automated integrity checks, database triggers, role-based access control, unified solo/team registrations, competitive match bracket management, conflict dispute handling, and financial ledgers denominated in **Indian Rupees (₹ INR)**.
 
 ---
 
-## 🏆 Project Modules (Phase 1 Scope)
+## 🏆 Complete Project Modules (All 6 Modules Implemented)
 
-1. **Module 1 — User & Profile Management**
-   - User registration, login, session JWT tokens, and bcrypt password hashing.
-   - Profile inspection, updating details (country, email, password).
-   - Role-Based Access Control (RBAC) separating **Players**, **Team Captains**, and **Administrators**.
+### Module 1 — User & Profile Management
+- User registration, authentication, JWT tokens with secure cookie/header authorization, and bcrypt password hashing.
+- Profile management: inspection and editing of profile details (country, email, password update).
+- Role-Based Access Control (RBAC) separating **Players**, **Team Captains**, and **Administrators**.
 
-2. **Module 2 — Game & Tournament Management**
-   - Games catalog (`Games`) storing esports titles, platforms, publishers, and genres.
-   - Tournament management (`Tournaments`) with formats (Single Elimination, Double Elimination, Round Robin), entry fees, participant capacity limits, and statuses (`Upcoming`, `Open`, `Ongoing`, `Completed`, `Cancelled`).
-   - 1:1 Tournament Rules (`TournamentRules`) storing `participation_type` (Solo vs Team), `team_size`, `min_age`, `region_restriction`, and rulebooks.
-   - Live tournament search and filtering.
+### Module 2 — Game & Tournament Management
+- Games catalog (`Games`) storing esports titles, platforms (PC, PS5, Xbox, Mobile), publishers, and genres.
+- Tournament management (`Tournaments`) supporting tournament formats (Single Elimination, Double Elimination, Round Robin), entry fees in INR (₹), capacity limits, and lifecycle statuses (`Upcoming`, `Open`, `Ongoing`, `Completed`, `Cancelled`).
+- 1:1 Tournament Rules (`TournamentRules`) storing `participation_type` (Solo vs Team), `team_size`, `min_age`, `region_restriction`, and official rulebooks.
+- Real-time tournament search and multifaceted filtering (game, format, status).
 
-3. **Module 3 — Team Management**
-   - Squad creation assigning the creator as **Captain** atomically in `Teams` and `TeamMembers`.
-   - Team roster tracking with composite key `(team_id, user_id)`.
-   - Captain permissions: invite members, update roles (`Captain`, `Starter`, `Substitute`), remove members, or disband team.
-   - Member capability to leave teams.
+### Module 3 — Team Management
+- Squad creation designating the creator as **Captain** atomically across `Teams` and `TeamMembers`.
+- Team roster tracking with composite primary key `(team_id, user_id)`.
+- Captain permissions: invite members, update roster roles (`Captain`, `Starter`, `Substitute`), remove members, or disband squad.
+- Roster membership controls allowing players to join or leave squads.
 
-4. **Module 4 — Unified Registration Management**
-   - Unified `Registrations` table for both individual players and teams.
-   - Strict exclusive-arc constraint:
-     ```sql
-     CONSTRAINT chk_one_entrant CHECK ((user_id IS NULL) <> (team_id IS NULL))
-     ```
-   - Unique constraints preventing duplicate solo and team signups:
-     ```sql
-     UNIQUE(tournament_id, user_id);
-     UNIQUE(tournament_id, team_id);
-     ```
-   - MySQL Triggers and transaction row locking enforcing registration deadlines, status validation, participation type matching, and maximum participant caps.
-   - Lifecycle workflow: `Pending` ➔ `Approved`, `Rejected`, or `Cancelled`.
-   - Audit integrity: cancelled entries are never physically deleted (`DELETE`); status transitions preserve full historical records.
+### Module 4 — Unified Registration Management
+- Unified `Registrations` table for both individual players and competitive teams.
+- Strict exclusive-arc constraint:
+  ```sql
+  CONSTRAINT chk_one_entrant CHECK ((user_id IS NULL) <> (team_id IS NULL))
+  ```
+- Unique constraints preventing duplicate solo and team signups:
+  ```sql
+  UNIQUE(tournament_id, user_id);
+  UNIQUE(tournament_id, team_id);
+  ```
+- MySQL Triggers and transaction row locking enforcing registration deadlines, status validation, participation type matching, and maximum participant caps.
+- Lifecycle workflow: `Pending` ➔ `Approved`, `Rejected`, or `Cancelled`.
+- Audit integrity: cancelled entries are never physically deleted (`DELETE`); status transitions preserve full historical records.
+
+### Module 5 — Match Scheduling & Results Management
+- **Matches (`Matches`)**: Schedule tournament rounds (Quarterfinals, Semifinals, Grand Finals), match numbering, scheduled timestamps, and statuses (`Scheduled`, `Live`, `Completed`, `Cancelled`). Unique constraint `(tournament_id, round_name, match_number)` guarantees bracket integrity.
+- **Match Participants (`MatchParticipants`)**: Assign approved registrations to match slots with composite primary key `(match_id, registration_id)` and unique slot constraints `(match_id, slot_number)`. Database trigger `trg_before_insert_match_participant` verifies that participant registrations belong strictly to the match's parent tournament.
+- **Match Results (`MatchResults`)**: Record participant scores and outcomes (`Win`, `Loss`, `Draw`, `Forfeit`). FK referencing `(match_id, registration_id)` ensures scores can only be recorded for assigned entrants.
+- **Match Disputes (`MatchDisputes`)**: Participants and team captains can raise dispute claims (`Open`, `Under Review`, `Resolved`, `Rejected`) directly from the Match Center with claim descriptions and timestamps.
+- **Result Corrections (`ResultCorrections`)**: Authorized administrators can adjust previously recorded match results with full audit history, logging `old_score`, `new_score`, timestamp, and optional dispute reference.
+
+### Module 6 — Payments and Prizes Management
+- **Payments (`Payments`)**: Track entry fee transactions associated with tournament registrations in **Indian Rupees (₹ INR)**. Supports `Pending`, `Success`, `Failed`, and `Refunded` statuses, transaction references, and payment methods (UPI, NetBanking, Credit Card, Debit Card).
+- **Prizes (`Prizes`)**: Allocate placement prize pools in **Indian Rupees (₹ INR)** with unique placement constraints per tournament `UNIQUE(tournament_id, placement)`. Database triggers `trg_before_insert_prize` and `trg_before_update_prize` ensure awarded winners belong to that tournament.
+- **Sponsors (`Sponsors`)**: Central brand partner catalog storing corporate entity names, contact emails, and country.
+- **Tournament Sponsorships (`TournamentSponsors`)**: M:N relational bridge table with composite primary key `(tournament_id, sponsor_id)` tracking brand funding capital contributed to each tournament in **Indian Rupees (₹ INR)**.
+
+---
+
+## 🇮🇳 Currency Standardization (Indian Rupees — ₹)
+
+All monetary representations throughout ArenaHQ use **Indian Rupees (₹)**:
+- **Consistent Helper**: Frontend utilizes `formatINR()` located in `src/utils/currency.ts` leveraging the `en-IN` locale and guaranteed `₹` symbol prefix (e.g., `₹50,000.00`, `₹1,500.00`).
+- **Preserved Numeric Values**: Numeric figures in the database and APIs remain clean floats/decimals without artificial unit conversions.
+- **Universal Application**: Entry fees, payment transaction amounts, placement prize rewards, net revenue aggregates, and sponsor capital contributions all render in INR across cards, tables, dashboards, modals, and detail pages.
 
 ---
 
@@ -45,236 +67,153 @@ A production-grade, full-stack esports tournament web application engineered acc
 | Layer | Technologies |
 |---|---|
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Axios, React Router v6 |
-| **Backend** | Node.js, Express, TypeScript, `mysql2/promise` (Connection Pooling & Transactions), bcryptjs, jsonwebtoken, cors, dotenv |
-| **Database** | MySQL 8.0 Server (Normalized 3NF, Foreign Keys, Triggers, Check Constraints) |
-| **Testing** | Jest, Supertest, ts-jest (24 integration test cases verified) |
-| **DevOps** | Docker, Docker Compose, Git |
+| **Backend** | Node.js, Express, TypeScript, `mysql2/promise` (Connection Pooling & ACID Transactions), bcryptjs, jsonwebtoken, cors, dotenv |
+| **Database** | MySQL 8.0 Server (Normalized 3NF, Foreign Keys, Triggers, Check Constraints, Composite Keys) |
+| **Testing** | Jest, Supertest, ts-jest (43 automated integration test cases verified) |
+| **DevOps & CI/CD** | Docker, Docker Compose, GitHub Actions, GitHub Pages SPA Deployment |
 
 ---
 
-## 📊 Database Design & Relational Model
+## 📊 Database Design & Relational Model (3NF)
 
-The system fully defines the **16 relational tables** from the DBMS project document:
+The system fully implements all **16 relational tables** from the DBMS project document:
 
-- **Core Implemented Modules (1–4)**: `Users`, `Games`, `Tournaments`, `TournamentRules`, `Teams`, `TeamMembers`, `Registrations`.
-- **Complete Schema (Modules 5–6 DDL Included)**: `Matches`, `MatchParticipants`, `MatchResults`, `Payments`, `Prizes`, `Sponsors`, `TournamentSponsors`, `MatchDisputes`, `ResultCorrections`.
+```mermaid
+erDiagram
+    USERS ||--o{ REGISTRATIONS : enters
+    USERS ||--o{ TEAMS : captains
+    USERS ||--o{ TEAMMEMBERS : belongs_to
+    GAMES ||--o{ TOURNAMENTS : hosts
+    TOURNAMENTS ||--|| TOURNAMENTRULES : defines
+    TOURNAMENTS ||--o{ REGISTRATIONS : receives
+    TOURNAMENTS ||--o{ MATCHES : schedules
+    TOURNAMENTS ||--o{ PRIZES : awards
+    TOURNAMENTS ||--o{ TOURNAMENTSPONSORS : funded_by
+    SPONSORS ||--o{ TOURNAMENTSPONSORS : contributes
+    TEAMS ||--o{ TEAMMEMBERS : includes
+    TEAMS ||--o{ REGISTRATIONS : enters
+    REGISTRATIONS ||--o{ PAYMENTS : generates
+    REGISTRATIONS ||--o{ MATCHPARTICIPANTS : slots_into
+    MATCHES ||--o{ MATCHPARTICIPANTS : contains
+    MATCHPARTICIPANTS ||--|| MATCHRESULTS : scores
+    MATCHPARTICIPANTS ||--o{ MATCHDISPUTES : contests
+    MATCHRESULTS ||--o{ RESULTCORRECTIONS : audits
+```
 
-### Key MySQL 8.0 Triggers
-- `trg_before_insert_registration`: Validates tournament open status, ensures `CURRENT_TIMESTAMP <= registration_deadline`, asserts solo vs team matches `TournamentRules.participation_type`, and verifies registration capacity count `< max_participants`.
-- `trg_before_update_registration`: Prevents mutating registrations into violating tournament rule types.
-- `trg_before_insert_match_participant`: Verifies that participants assigned to a match belong to the match's host tournament.
+### Database Integrity Triggers
+1. `trg_before_insert_registration`: Enforces the exclusive entrant rule `(user_id IS NULL) <> (team_id IS NULL)`.
+2. `trg_before_update_registration`: Validates allowed status transitions.
+3. `trg_before_insert_match_participant`: Verifies assigned entrant registration belongs to the match's tournament.
+4. `trg_before_insert_prize` & `trg_before_update_prize`: Validates that any awarded winner registration belongs to the tournament awarding the prize.
 
 ---
 
-## ⚡ Quick Start & Installation
+## 🚀 Quick Start & Local Setup
 
 ### Prerequisites
-- Node.js (v18+)
-- MySQL Server 8.0 (running locally on port 3306 or via Docker)
-- npm or pnpm
+- **Node.js** (v18 or v20+)
+- **MySQL Server 8.0** running locally on port 3306
 
-### 1. Clone & Setup Project
+### 1. Database Initialization
+Execute the SQL initialization scripts in order:
+
 ```bash
-git clone https://github.com/StrangeQuark590/gaming-tournament-system.git
-cd gaming-tournament-system
+mysql -u root -p gaming_tournament_db < database/01_schema.sql
+mysql -u root -p gaming_tournament_db < database/02_triggers.sql
+mysql -u root -p gaming_tournament_db < database/03_seed.sql
 ```
 
-### 2. Configure Environment Variables
-Create `.env` inside `backend/`:
-```bash
-cp .env.example backend/.env
-```
-Ensure your database credentials match your local MySQL 8.0 instance:
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-DB_NAME=gaming_tournament_db
-PORT=5000
-JWT_SECRET=super_secret_gaming_tournament_jwt_key_2026_secure
-JWT_EXPIRES_IN=7d
-CLIENT_URL=http://localhost:5173
-```
-
-### 3. Initialize Database Schema & Seed Data
-Execute the scripts using MySQL CLI or the provided npm runner:
+### 2. Backend Setup
 ```bash
 cd backend
 npm install
-npm run db:init
-npm run db:seed
-```
-*Alternatively, load the SQL files directly in MySQL Workbench:*
-1. `database/01_schema.sql`
-2. `database/02_triggers.sql`
-3. `database/03_seed.sql`
-
-### 4. Start Backend Server
-```bash
-cd backend
+cp ../.env.example .env
+# Edit .env with your MySQL credentials (DB_USER, DB_PASSWORD, DB_NAME)
 npm run dev
-# Server listening on http://localhost:5000
 ```
+Backend runs at `http://localhost:5000`.
 
-### 5. Start Frontend Client
-In a new terminal:
+### 3. Frontend Setup
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev
-# Frontend live on http://localhost:5173
 ```
+Frontend runs at `http://localhost:5173`.
 
 ---
 
-## 🐳 Running with Docker Compose (One-Click)
+## 👥 Demo Personas
 
-Launch the entire stack (MySQL 8.0 container + Node.js backend + Nginx React frontend) with a single command:
-```bash
-docker-compose up --build
-```
-- Frontend UI: `http://localhost:80`
-- Backend API: `http://localhost:5000/api`
-- MySQL Database: `localhost:3306`
+The database comes pre-seeded with realistic esports tournament data and quick persona logins:
+
+| Username | Role / Team | Password | Permissions & Scope |
+|---|---|---|---|
+| `admin` | **Administrator** | `Admin@123` | Full access to all 6 modules, dispute review, score corrections, financial ledger, and prizes. |
+| `shroud_jr` | **Player / Captain** | `Player@123` | Captain of team **Sentinels**, registered in Valorant Champions. Can raise disputes and pay entry fees. |
+| `s1mple_king` | **Player / Captain** | `Player@123` | Captain of team **Natus Vincere (NAVI)**, registered in CS2 Major. |
+| `soloplayer1` | **Player (Solo)** | `Player@123` | Solo entrant in Tekken 8 Masters. |
+
+*Use the **Demo Switcher** in the top navigation bar to switch personas instantly with one click.*
 
 ---
 
-## 🧪 Automated Testing
+## 🧪 Automated Integration Tests
 
-Run the automated integration tests against real MySQL tables:
+All 6 test suites and **43 test cases** run against the local MySQL 8.0 database:
+
 ```bash
 cd backend
 npm test
 ```
-The test suite validates:
-- **Module 1**: Player registration, duplicate rejection, login authentication, JWT verification, and RBAC admin-route blocking.
-- **Module 2**: Game creation permissions, dates validation (`end_date >= start_date`), tournament and 1:1 rules insertion.
-- **Module 3**: Team creation, automatic captain designation in `Teams` & `TeamMembers`, roster querying, captain-only member additions, duplicate member rejection.
-- **Module 4**: Solo registration into solo events, rejection of solo entry into team tournaments, duplicate prevention (`UNIQUE`), team entry by captain, 403 rejection for non-captains, admin approval workflow, and cancellation history preservation.
+
+### Test Suite Summary:
+- `src/tests/auth.test.ts` (Module 1): Registration, duplicate username handling, password verification, JWT token issuance, protected route access.
+- `src/tests/games-tournaments.test.ts` (Module 2): Game catalog CRUD, tournament creation, date validation (`end_date > start_date`), rules association.
+- `src/tests/teams.test.ts` (Module 3): Squad creation, automatic Captain assignment, roster management, duplicate member rejection.
+- `src/tests/registrations.test.ts` (Module 4): Unified registrations, exclusive entrant XOR check, duplicate prevention, status transitions.
+- `src/tests/matches.test.ts` (Module 5): Match scheduling, slot assignments, duplicate match number prevention, cross-tournament validation, disputes, and audited result corrections.
+- `src/tests/financial.test.ts` (Module 6): Entry fee payments in INR, unique prize placements, cross-tournament prize award rejection, sponsor directory, and tournament sponsorship contributions.
 
 ---
 
-## 🔑 Demo Evaluator Accounts
+## 🌐 Online Deployment Guide
 
-All seed user accounts use the default password: **`Password123!`**
+### Option 1: GitHub Pages (Frontend)
+This repository includes a pre-configured GitHub Actions workflow in `.github/workflows/deploy.yml`:
+1. Push your repository to GitHub (`master` or `main` branch).
+2. Go to **Settings** ➔ **Pages** ➔ **Source** and select **GitHub Actions**.
+3. The workflow automatically tests the backend, builds the frontend with Vite, installs the `404.html` SPA routing redirect, and deploys to `https://<username>.github.io/<repo>/`.
 
-| Username | Role | Persona / Capabilities |
-|---|---|---|
-| **`admin`** | Administrator | Full dashboard, create tournaments & games, approve/reject registrations |
-| **`priyanshu`** | Administrator | Co-organizer admin account |
-| **`shroud_jr`** | Team Captain | Captain of **Sentinels Elite**, manages roster, registers team in Valorant |
-| **`s1mple_king`**| Team Captain | Captain of **NAVI Reborn**, manages roster, registers team in CS2 |
-| **`faker_legend`**| Team Captain | Captain of **T1 Prodigies** |
-| **`soloplayer1`** | Player (Solo) | Enters solo events (Tekken 8, Rocket League), views personal registrations |
+### Option 2: Full Docker Deployment
+A complete multi-container setup is ready out of the box:
 
-*Pro Tip: The application UI features a **"Demo Switcher"** in the top navigation bar to switch between administrator and player personas with a single click!*
-
----
-
-## 📁 Repository Structure
-
+```bash
+docker-compose up --build -d
 ```
-gaming-tournament-system/
-├── backend/
-│   ├── src/
-│   │   ├── config/db.ts              # MySQL 8.0 connection pool & transaction helper
-│   │   ├── controllers/              # Business logic for all 4 modules
-│   │   ├── middleware/               # JWT auth, RBAC admin check, error handling
-│   │   ├── routes/                   # RESTful API route declarations
-│   │   ├── types/                    # TypeScript interfaces
-│   │   ├── db/                       # Programmatic DB migration & seed runners
-│   │   ├── tests/                    # 24 Jest integration test cases
-│   │   ├── app.ts                    # Express application configuration
-│   │   └── server.ts                 # HTTP server entry point
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── src/
-│   │   ├── api/                      # Axios API clients for auth, games, teams, etc.
-│   │   ├── components/               # Navbar, Footer, TournamentCard, RegisterModal, etc.
-│   │   ├── context/AuthContext.tsx   # React Authentication state & demo persona switcher
-│   │   ├── pages/                    # Home, Tournaments, Teams, Profile, Login, Register
-│   │   ├── pages/admin/              # Admin Dashboard, Tournaments, Games, Registrations
-│   │   ├── App.tsx                   # React Router routing tree
-│   │   └── main.tsx                  # Vite React entry point
-│   ├── package.json
-│   └── tailwind.config.js
-├── database/
-│   ├── 01_schema.sql                 # 16-table normalized DDL schema with constraints
-│   ├── 02_triggers.sql               # Registration deadline & type cross-table triggers
-│   └── 03_seed.sql                   # Realistic sample data & Section 13 query fixtures
-├── docker-compose.yml                # Multi-container orchestration
-├── Dockerfile.backend                # Multi-stage production Node.js container
-├── Dockerfile.frontend               # Multi-stage Nginx React container
-├── .env.example                      # Configuration template
-└── README.md                         # Project documentation
+- Frontend: `http://localhost:80` (served with Nginx and reverse proxy to `/api/`).
+- Backend: `http://localhost:5000`.
+- MySQL 8.0: `localhost:3306` (automatically runs schema, triggers, and seed scripts on initial container startup).
+
+### Option 3: Cloud Hosting (Render / Railway)
+- **Database**: Spin up a managed MySQL 8.0 service on Railway or Aiven, and run `01_schema.sql`, `02_triggers.sql`, and `03_seed.sql`.
+- **Backend**: Deploy `backend/` as a Node web service, configuring environment variables `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, and `CLIENT_URL`.
+- **Frontend**: Deploy `frontend/` as a static site or to Vercel/Netlify with build command `npm run build` and output directory `dist`.
+
+---
+
+## 📑 DBMS Section 13 Query Verification
+
+The application implements the official analytical query from Section 13 of the DBMS specification to aggregate solo versus team entrants directly from the relational database:
+
+```sql
+SELECT t.title,
+       SUM(r.user_id IS NOT NULL) AS solo_entries,
+       SUM(r.team_id IS NOT NULL) AS team_entries
+FROM Tournaments t
+JOIN Registrations r ON r.tournament_id = t.tournament_id
+WHERE r.status <> 'Cancelled'
+GROUP BY t.tournament_id, t.title;
 ```
 
----
-
-## 🌐 Sample SQL Queries (Section 13)
-
-The application implements the analytical queries documented in the specification:
-
-1. **Tournaments open for registration**:
-   ```sql
-   SELECT t.tournament_id, t.title, g.game_name, t.entry_fee, t.registration_deadline
-   FROM Tournaments t
-   JOIN Games g ON g.game_id = t.game_id
-   WHERE t.status = 'Open' AND t.registration_deadline >= CURDATE();
-   ```
-
-2. **Team roster and captain status**:
-   ```sql
-   SELECT t.team_name, u.username, tm.member_role, (u.user_id = t.captain_id) AS is_captain
-   FROM Teams t
-   JOIN TeamMembers tm ON tm.team_id = t.team_id
-   JOIN Users u ON u.user_id = tm.user_id
-   WHERE t.team_id = 1;
-   ```
-
-3. **Solo versus team registrations per tournament**:
-   ```sql
-   SELECT t.title,
-          SUM(r.user_id IS NOT NULL) AS solo_entries,
-          SUM(r.team_id IS NOT NULL) AS team_entries
-   FROM Tournaments t
-   JOIN Registrations r ON r.tournament_id = t.tournament_id
-   WHERE r.status <> 'Cancelled'
-   GROUP BY t.tournament_id, t.title;
-   ```
-
----
-
-## 🚀 Deployment Guide
-
-### Deploying to Render / Railway
-1. **Database**: Spin up a managed MySQL 8.0 instance on Railway, Aiven, or AWS RDS.
-2. **Schema**: Run `database/01_schema.sql`, `02_triggers.sql`, and `03_seed.sql` against the managed database.
-3. **Backend**:
-   - Set Build Command: `npm install && npm run build`
-   - Set Start Command: `npm start`
-   - Provide environment variables (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `CLIENT_URL`).
-4. **Frontend**:
-   - Set Build Command: `npm install && npm run build`
-   - Set Publish Directory: `dist`
-   - Set `VITE_API_URL` to your live backend domain.
-
----
-
-## 📝 Project Limitations & Future Roadmap
-
-As specified in the project requirements:
-- **Scope Boundary**: Match scheduling (rounds and brackets), match result tracking, payments, prizes, and dispute resolution belong to Phase 2 (Modules 5 & 6) and are planned for future extension.
-- **Automatic Brackets**: Brackets are defined by organizers; algorithmic bracket tree auto-generation is slated for the match scheduling phase.
-- **Payment Processing**: Payment records and schema are defined in `Payments`; live third-party payment gateway integration (Stripe / Razorpay) will be added with Module 6.
-
----
-
-## 👥 Credits
-Submitted for **Database Management System (DBMS)**:
-- **Priyanshu** (2025UCS1582)
-- **Dixsant Kumar** (2025UCS1612)
-- **Ridham** (2025UCS1609)
-- **Arpit Gahlawat** (2025UCS1623)
+This live aggregation is rendered on the **Administrator Dashboard** (`/admin`), demonstrating true relational database query execution without mock data.

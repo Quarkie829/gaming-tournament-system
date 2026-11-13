@@ -3,6 +3,7 @@ import { Tournament, UserEligibility } from '../types';
 import { registrationsApi } from '../api/registrationsApi';
 import { X, ShieldAlert, CheckCircle2, Users, User, ArrowRight, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { formatINR } from '../utils/currency';
 
 interface RegisterModalProps {
   tournament: Tournament;
@@ -116,7 +117,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Entry Fee:</span>
                 <span className="font-semibold text-emerald-400">
-                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : `$${Number(tournament.entry_fee).toFixed(2)}`}
+                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : formatINR(tournament.entry_fee)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -150,7 +151,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Entry Fee (Per Team):</span>
                 <span className="font-semibold text-emerald-400">
-                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : `$${Number(tournament.entry_fee).toFixed(2)}`}
+                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : formatINR(tournament.entry_fee)}
                 </span>
               </div>
             </div>

@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   ArrowLeft
 } from 'lucide-react';
+import { formatINR } from '../../utils/currency';
 
 export const AdminTournamentsPage: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -261,7 +262,7 @@ export const AdminTournamentsPage: React.FC = () => {
                     {t.max_participants}
                   </td>
                   <td className="px-4 py-3 font-semibold text-emerald-400 font-mono">
-                    {Number(t.entry_fee) === 0 ? 'FREE' : `$${Number(t.entry_fee).toFixed(2)}`}
+                    {formatINR(t.entry_fee, { showFreeForZero: true })}
                   </td>
                   <td className="px-4 py-3">
                     <select
@@ -411,7 +412,7 @@ export const AdminTournamentsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Entry Fee ($)
+                    Entry Fee (₹)
                   </label>
                   <input
                     type="number"

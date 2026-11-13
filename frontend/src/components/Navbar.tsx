@@ -43,10 +43,10 @@ export const Navbar: React.FC = () => {
             </div>
             <div>
               <span className="font-heading text-xl font-bold tracking-wider text-white flex items-center gap-1.5">
-                TOURNAMENT<span className="text-blue-500">.GG</span>
+                Arena<span className="text-blue-500">HQ</span>
               </span>
               <span className="text-[10px] text-slate-400 font-mono block -mt-1 tracking-widest uppercase">
-                DBMS System
+                Tournament System
               </span>
             </div>
           </Link>
@@ -62,6 +62,17 @@ export const Navbar: React.FC = () => {
               }`}
             >
               Tournaments
+            </Link>
+
+            <Link
+              to="/matches"
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive('/matches') || location.pathname.startsWith('/matches/')
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              Matches
             </Link>
 
             <Link
@@ -205,6 +216,13 @@ export const Navbar: React.FC = () => {
             className="block px-3 py-2 rounded-lg text-base font-medium text-slate-300 hover:text-white hover:bg-slate-800"
           >
             Tournaments
+          </Link>
+          <Link
+            to="/matches"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block px-3 py-2 rounded-lg text-base font-medium text-slate-300 hover:text-white hover:bg-slate-800"
+          >
+            Matches
           </Link>
           <Link
             to="/teams"

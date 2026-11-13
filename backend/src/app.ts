@@ -6,6 +6,8 @@ import gameRoutes from './routes/gameRoutes';
 import tournamentRoutes from './routes/tournamentRoutes';
 import teamRoutes from './routes/teamRoutes';
 import registrationRoutes from './routes/registrationRoutes';
+import matchRoutes from './routes/matchRoutes';
+import financialRoutes from './routes/financialRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 export const app = express();
@@ -29,13 +31,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API Routes (Modules 1 - 4)
+// API Routes (Modules 1 - 6)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/matches', matchRoutes);
+app.use('/api', financialRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

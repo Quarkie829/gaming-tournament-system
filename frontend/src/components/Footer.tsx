@@ -13,7 +13,7 @@ export const Footer: React.FC = () => {
                 <Trophy className="w-4 h-4" />
               </div>
               <span className="font-heading text-lg font-bold tracking-wider text-white">
-                Gaming Tournament Management System
+                ArenaHQ — Gaming Tournament Management System
               </span>
             </div>
             <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-4">

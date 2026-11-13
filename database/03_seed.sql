@@ -160,6 +160,16 @@ INSERT INTO TournamentSponsors (tournament_id, sponsor_id, contribution_amount, 
 (1, 2, 15000.00, '2026-10-05'),
 (2, 3, 8000.00, '2026-10-10');
 
--- Conclude historical tournaments
+-- 15. MATCHDISPUTES
+INSERT INTO MatchDisputes (dispute_id, match_id, registration_id, reason, status, raised_at) VALUES
+(1, 1, 2, 'Score discrepancy on Map 2 overtime round count', 'Resolved', '2026-11-15 13:15:00');
+
+-- 16. RESULTCORRECTIONS
+INSERT INTO ResultCorrections (correction_id, match_id, registration_id, dispute_id, old_score, new_score, corrected_at) VALUES
+(1, 1, 2, 1, 0, 1, '2026-11-15 13:45:00');
+
+-- Conclude historical tournaments and award prize
 UPDATE Tournaments SET status = 'Completed' WHERE tournament_id = 6;
+UPDATE Prizes SET awarded_registration_id = 1 WHERE prize_id = 1;
+
 

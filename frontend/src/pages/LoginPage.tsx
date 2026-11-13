@@ -52,7 +52,7 @@ export const LoginPage: React.FC = () => {
             <Trophy className="w-6 h-6" />
           </div>
           <h2 className="font-heading text-3xl font-extrabold text-white">
-            Sign In to Tournament.gg
+            Sign In to ArenaHQ
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             Access your tournament registrations, teams, and administrative dashboard

@@ -366,7 +366,7 @@ export async function deleteTournament(req: AuthenticatedRequest, res: Response,
 
 export async function getTournamentStats(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    // 1. Total counts
+    // 1. Total counts across all 6 modules
     const counts = await query<any[]>(`
       SELECT
         (SELECT COUNT(*) FROM Tournaments) AS total_tournaments,
@@ -374,7 +374,12 @@ export async function getTournamentStats(req: AuthenticatedRequest, res: Respons
         (SELECT COUNT(*) FROM Users) AS total_users,
         (SELECT COUNT(*) FROM Teams) AS total_teams,
         (SELECT COUNT(*) FROM Registrations WHERE status = 'Approved') AS approved_registrations,
-        (SELECT COUNT(*) FROM Registrations WHERE status = 'Pending') AS pending_registrations
+        (SELECT COUNT(*) FROM Registrations WHERE status = 'Pending') AS pending_registrations,
+        (SELECT COUNT(*) FROM Matches) AS total_matches,
+        (SELECT COUNT(*) FROM MatchDisputes WHERE status IN ('Open', 'Under Review')) AS open_disputes,
+        (SELECT COALESCE(SUM(amount), 0) FROM Payments WHERE payment_status = 'Success') AS total_revenue,
+        (SELECT COALESCE(SUM(prize_amount), 0) FROM Prizes) AS total_prize_pool,
+        (SELECT COUNT(*) FROM Sponsors) AS total_sponsors
     `);
 
     // 2. Solo vs Team breakdown (Matches PDF query from section 13)
