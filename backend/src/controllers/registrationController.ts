@@ -326,9 +326,9 @@ export async function getMyRegistrations(req: AuthenticatedRequest, res: Respons
              tm.team_name,
              cap.username AS captain_username,
              (r.user_id = ? OR tm.captain_id = ?) AS can_cancel,
-             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_status,
-             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_reference,
-             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS paid_amount
+             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS payment_status,
+             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS payment_reference,
+             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS paid_amount
       FROM Registrations r
       JOIN Tournaments t ON t.tournament_id = r.tournament_id
       JOIN Games g ON g.game_id = t.game_id
@@ -363,9 +363,9 @@ export async function listAllRegistrations(req: AuthenticatedRequest, res: Respo
              tr.participation_type,
              u.username AS player_username, u.email AS player_email, u.country AS player_country,
              tm.team_name, cap.username AS captain_username,
-             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_status,
-             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_reference,
-             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS paid_amount
+             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS payment_status,
+             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS payment_reference,
+             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id ORDER BY p.payment_id DESC LIMIT 1) AS paid_amount
       FROM Registrations r
       JOIN Tournaments t ON t.tournament_id = r.tournament_id
       JOIN Games g ON g.game_id = t.game_id
@@ -471,11 +471,28 @@ export async function updateRegistrationStatus(req: AuthenticatedRequest, res: R
       }
     }
 
+    // If rejecting a registration that has an active payment, automatically mark the payment as Refunded
+    let refundNote = '';
+    if (status === 'Rejected') {
+      const payments = await query<any[]>(
+        "SELECT payment_id, amount FROM Payments WHERE registration_id = ? AND payment_status = 'Success'",
+        [registrationId]
+      );
+      if (payments.length > 0) {
+        await query(
+          "UPDATE Payments SET payment_status = 'Refunded' WHERE registration_id = ? AND payment_status = 'Success'",
+          [registrationId]
+        );
+        const refundedTotal = payments.reduce((acc, p) => acc + parseFloat(p.amount), 0);
+        refundNote = ` Entry fee of ₹${refundedTotal.toLocaleString('en-IN')} has been automatically processed for refund.`;
+      }
+    }
+
     await query('UPDATE Registrations SET status = ? WHERE registration_id = ?', [status, registrationId]);
 
     res.json({
       success: true,
-      message: `Registration status updated to "${status}".`
+      message: `Registration status updated to "${status}".${refundNote}`
     });
   } catch (err) {
     next(err);
@@ -517,13 +534,28 @@ export async function cancelRegistration(req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    // If cancelling a registration with active entry fee payment, process automatic refund
+    let cancelRefundNote = '';
+    const payments = await query<any[]>(
+      "SELECT payment_id, amount FROM Payments WHERE registration_id = ? AND payment_status = 'Success'",
+      [registrationId]
+    );
+    if (payments.length > 0) {
+      await query(
+        "UPDATE Payments SET payment_status = 'Refunded' WHERE registration_id = ? AND payment_status = 'Success'",
+        [registrationId]
+      );
+      const refundedTotal = payments.reduce((acc, p) => acc + parseFloat(p.amount), 0);
+      cancelRefundNote = ` Entry fee of ₹${refundedTotal.toLocaleString('en-IN')} has been automatically processed for refund.`;
+    }
+
     // Per document specification page 6 & 14:
     // "Cancelled entries are deleted, losing history? Status columns (Pending/Approved/Rejected/Cancelled) keep every record. Rows are never deleted; status columns change instead."
     await query('UPDATE Registrations SET status = ? WHERE registration_id = ?', ['Cancelled', registrationId]);
 
     res.json({
       success: true,
-      message: 'Registration successfully cancelled. History record preserved.'
+      message: `Registration successfully cancelled.${cancelRefundNote} History record preserved.`
     });
   } catch (err) {
     next(err);

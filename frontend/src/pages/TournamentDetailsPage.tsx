@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   CreditCard,
+  RefreshCw,
   Ban,
   ArrowLeft,
   Swords,
@@ -221,7 +222,12 @@ export const TournamentDetailsPage: React.FC = () => {
                   </div>
 
                   {Number(tournament.entry_fee) > 0 && (
-                    userRegistration.payment_status === 'Success' ? (
+                    userRegistration.payment_status === 'Refunded' ? (
+                      <div className="p-2 rounded-xl bg-cyan-950/50 border border-cyan-500/30 text-[11px] text-cyan-300 flex items-center space-x-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                        <span>Entry Fee Refunded ({formatINR(tournament.entry_fee)})</span>
+                      </div>
+                    ) : userRegistration.payment_status === 'Success' ? (
                       <div className="p-2 rounded-xl bg-emerald-950/50 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center space-x-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                         <span>Entry Fee Paid: {formatINR(userRegistration.paid_amount || tournament.entry_fee)}</span>

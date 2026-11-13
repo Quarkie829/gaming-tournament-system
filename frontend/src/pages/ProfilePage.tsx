@@ -25,7 +25,8 @@ import {
   ExternalLink,
   IndianRupee,
   Receipt,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
@@ -359,7 +360,12 @@ export const ProfilePage: React.FC = () => {
                               </div>
                               {fee > 0 && (
                                 <div className="mt-0.5">
-                                  {hasPaid ? (
+                                  {r.payment_status === 'Refunded' ? (
+                                    <span className="text-[10px] text-cyan-400 font-semibold flex items-center space-x-1">
+                                      <RefreshCw className="w-3 h-3" />
+                                      <span>Fee Refunded</span>
+                                    </span>
+                                  ) : hasPaid ? (
                                     <span className="text-[10px] text-emerald-400 font-semibold flex items-center space-x-1">
                                       <CheckCircle2 className="w-3 h-3" />
                                       <span>Paid (INR)</span>

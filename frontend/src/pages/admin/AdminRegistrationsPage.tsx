@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   Calendar,
   Clock,
-  CreditCard
+  CreditCard,
+  RefreshCw
 } from 'lucide-react';
 
 export const AdminRegistrationsPage: React.FC = () => {
@@ -208,7 +209,8 @@ export const AdminRegistrationsPage: React.FC = () => {
                   const isSolo = r.user_id !== null;
                   const fee = Number(r.entry_fee) || 0;
                   const isPaid = fee > 0 && r.payment_status === 'Success';
-                  const isUnpaid = fee > 0 && !isPaid;
+                  const isRefunded = fee > 0 && r.payment_status === 'Refunded';
+                  const isUnpaid = fee > 0 && !isPaid && !isRefunded;
 
                   return (
                     <tr key={r.registration_id} className="hover:bg-slate-800/40 transition-colors">
@@ -247,6 +249,18 @@ export const AdminRegistrationsPage: React.FC = () => {
                           <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
                             Free Entry (₹0)
                           </span>
+                        ) : isRefunded ? (
+                          <div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1 w-fit">
+                              <RefreshCw className="w-3 h-3 text-cyan-400" />
+                              <span>Refunded: {formatINR(r.paid_amount || fee)}</span>
+                            </span>
+                            {r.payment_reference && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[130px]" title={r.payment_reference}>
+                                Ref: {r.payment_reference}
+                              </div>
+                            )}
+                          </div>
                         ) : isPaid ? (
                           <div>
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1 w-fit">
