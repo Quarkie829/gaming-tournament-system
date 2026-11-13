@@ -45,10 +45,12 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Initialize MySQL Database (Schema, Triggers, Seed)
+        env:
+          MYSQL_PWD: Priyanshu123@
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -pPriyanshu123@ gaming_tournament_db < database/01_schema.sql
-          mysql -h 127.0.0.1 -P 3306 -u root -pPriyanshu123@ gaming_tournament_db < database/02_triggers.sql
-          mysql -h 127.0.0.1 -P 3306 -u root -pPriyanshu123@ gaming_tournament_db < database/03_seed.sql
+          mysql -h 127.0.0.1 -P 3306 -u root gaming_tournament_db < database/01_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -u root gaming_tournament_db < database/02_triggers.sql
+          mysql -h 127.0.0.1 -P 3306 -u root gaming_tournament_db < database/03_seed.sql
 
       - name: Install Backend Dependencies
         working-directory: backend
@@ -99,7 +101,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_BASE_PATH: './'
-          VITE_API_URL: '/api'
+          VITE_API_URL: ${{ vars.VITE_API_URL || '/api' }}
         run: npm run build
 
       - name: Copy 404 fallback for SPA deep routing
