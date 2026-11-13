@@ -20,7 +20,6 @@ import {
   Mail,
   Send,
   Clock,
-  UserCheck,
   XCircle,
   Check
 } from 'lucide-react';
@@ -41,7 +40,6 @@ export const TeamDetailsPage: React.FC = () => {
   // Add / Invite Member State
   const [addUsername, setAddUsername] = useState<string>('');
   const [addRole, setAddRole] = useState<string>('Starter');
-  const [inviteMode, setInviteMode] = useState<'invite' | 'direct'>('invite');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -67,30 +65,22 @@ export const TeamDetailsPage: React.FC = () => {
     fetchTeamDetails();
   }, [id, user]);
 
-  const handleInviteOrAddMember = async (e: React.FormEvent, mode: 'invite' | 'direct') => {
+  const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !addUsername.trim()) return;
 
     try {
       setActionLoading(true);
       setFeedbackMsg(null);
-      if (mode === 'invite') {
-        const res = await teamsApi.invitePlayer(parseInt(id, 10), {
-          username: addUsername.trim(),
-          member_role: addRole
-        });
-        setFeedbackMsg({ type: 'success', text: res.message });
-      } else {
-        const res = await teamsApi.addMember(parseInt(id, 10), {
-          username: addUsername.trim(),
-          member_role: addRole
-        });
-        setFeedbackMsg({ type: 'success', text: res.message });
-      }
+      const res = await teamsApi.invitePlayer(parseInt(id, 10), {
+        username: addUsername.trim(),
+        member_role: addRole
+      });
+      setFeedbackMsg({ type: 'success', text: res.message });
       setAddUsername('');
       await fetchTeamDetails();
     } catch (err: any) {
-      setFeedbackMsg({ type: 'error', text: err.message || 'Action failed.' });
+      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to send invitation.' });
     } finally {
       setActionLoading(false);
     }
@@ -515,45 +505,15 @@ export const TeamDetailsPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h3 className="font-heading text-lg font-bold text-white flex items-center space-x-2">
                   <UserPlus className="w-4 h-4 text-purple-400" />
-                  <span>Roster Recruitment</span>
+                  <span>Invite Player to Team</span>
                 </h3>
               </div>
 
-              {/* Toggle mode: Invite vs Direct Add */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setInviteMode('invite')}
-                  className={`py-1.5 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-1 ${
-                    inviteMode === 'invite'
-                      ? 'bg-purple-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Send className="w-3 h-3" />
-                  <span>Send Invite</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInviteMode('direct')}
-                  className={`py-1.5 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-1 ${
-                    inviteMode === 'direct'
-                      ? 'bg-purple-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <UserCheck className="w-3 h-3" />
-                  <span>Direct Add</span>
-                </button>
-              </div>
-
               <p className="text-[11px] text-slate-400">
-                {inviteMode === 'invite'
-                  ? 'Sends an invitation to the player. The player must accept before joining the roster.'
-                  : 'Directly enters the player into your team roster immediately.'}
+                Send an official team invitation. The player will receive the invitation in their profile and must accept it before they are added to the roster.
               </p>
 
-              <form onSubmit={(e) => handleInviteOrAddMember(e, inviteMode)} className="space-y-4">
+              <form onSubmit={handleInviteMember} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                     Player Username
@@ -589,13 +549,10 @@ export const TeamDetailsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={actionLoading || !addUsername.trim()}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 transition-all shadow-md shadow-purple-600/20"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 transition-all shadow-md shadow-purple-600/20 flex items-center justify-center space-x-2"
                 >
-                  {actionLoading
-                    ? 'Processing...'
-                    : inviteMode === 'invite'
-                    ? 'Send Team Invitation'
-                    : 'Add Player to Roster'}
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{actionLoading ? 'Sending...' : 'Send Team Invitation'}</span>
                 </button>
               </form>
             </div>

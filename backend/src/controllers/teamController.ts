@@ -204,8 +204,12 @@ export async function addTeamMember(req: AuthenticatedRequest, res: Response, ne
       return;
     }
 
-    if (teams[0].captain_id !== currentUserId && req.user?.role !== 'admin') {
-      res.status(403).json({ success: false, message: 'Only the team captain can add members.' });
+    // Direct player addition without invitation is disabled for team captains
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({
+        success: false,
+        message: 'Direct player addition is disabled. Team captains must invite players using the invitation system so the player can accept or decline.'
+      });
       return;
     }
 
