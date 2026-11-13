@@ -19,6 +19,9 @@ import {
   FileText,
   AlertTriangle,
   CheckCircle,
+  CheckCircle2,
+  AlertCircle,
+  CreditCard,
   Ban,
   ArrowLeft,
   Swords,
@@ -216,6 +219,32 @@ export const TournamentDetailsPage: React.FC = () => {
                     </span>
                     <StatusBadge status={userRegistration.status} />
                   </div>
+
+                  {Number(tournament.entry_fee) > 0 && (
+                    userRegistration.payment_status === 'Success' ? (
+                      <div className="p-2 rounded-xl bg-emerald-950/50 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center space-x-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <span>Entry Fee Paid: {formatINR(userRegistration.paid_amount || tournament.entry_fee)}</span>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-[11px] text-amber-200 space-y-1">
+                        <div className="flex items-center space-x-1.5 font-semibold text-amber-400">
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>Entry Fee Unpaid ({formatINR(tournament.entry_fee)})</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300">
+                          Slot cannot be approved until entry fee is settled.
+                        </p>
+                        <Link
+                          to="/profile"
+                          className="inline-block text-[11px] font-bold text-amber-400 hover:text-white underline mt-0.5"
+                        >
+                          Pay Entry Fee in Profile →
+                        </Link>
+                      </div>
+                    )
+                  )}
+
                   <button
                     onClick={() => handleCancelRegistration(userRegistration.registration_id)}
                     disabled={actionLoading}

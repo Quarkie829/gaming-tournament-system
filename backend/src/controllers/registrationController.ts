@@ -7,6 +7,7 @@ export async function registerSolo(req: AuthenticatedRequest, res: Response, nex
   try {
     const userId = req.user?.user_id;
     const tournamentId = parseInt(req.body.tournament_id, 10);
+    const { payment_method, transaction_reference } = req.body;
 
     if (!userId) {
       res.status(401).json({ success: false, message: 'Authentication required.' });
@@ -22,7 +23,7 @@ export async function registerSolo(req: AuthenticatedRequest, res: Response, nex
     const registrationId = await withTransaction(async (conn) => {
       // 1. Lock and fetch tournament info
       const [tournaments]: any = await conn.execute(
-        `SELECT t.tournament_id, t.status, t.registration_deadline, t.max_participants,
+        `SELECT t.tournament_id, t.title, t.status, t.entry_fee, t.registration_deadline, t.max_participants,
                 tr.participation_type
          FROM Tournaments t
          LEFT JOIN TournamentRules tr ON tr.tournament_id = t.tournament_id
@@ -37,6 +38,7 @@ export async function registerSolo(req: AuthenticatedRequest, res: Response, nex
       }
 
       const tourn = tournaments[0];
+      const entryFeeNum = parseFloat(tourn.entry_fee) || 0;
 
       // 2. Validate participation type
       if (tourn.participation_type !== 'Solo') {
@@ -79,6 +81,17 @@ export async function registerSolo(req: AuthenticatedRequest, res: Response, nex
             'UPDATE Registrations SET status = ?, registration_date = NOW() WHERE registration_id = ?',
             ['Pending', prev.registration_id]
           );
+
+          // If entry fee > 0 and payment method provided, record payment atomically
+          if (entryFeeNum > 0 && payment_method) {
+            const ref = transaction_reference?.trim() || `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            await conn.execute(
+              `INSERT INTO Payments (registration_id, amount, payment_method, payment_status, transaction_reference, paid_at)
+               VALUES (?, ?, ?, 'Success', ?, NOW())`,
+              [prev.registration_id, entryFeeNum, payment_method.trim(), ref]
+            );
+          }
+
           return prev.registration_id;
         }
       }
@@ -102,8 +115,19 @@ export async function registerSolo(req: AuthenticatedRequest, res: Response, nex
         'INSERT INTO Registrations (tournament_id, user_id, team_id, status, registration_date) VALUES (?, ?, NULL, ?, NOW())',
         [tournamentId, userId, 'Pending']
       );
+      const newRegId = insertResult.insertId;
 
-      return insertResult.insertId;
+      // If entry fee > 0 and payment method provided, record payment atomically
+      if (entryFeeNum > 0 && payment_method) {
+        const ref = transaction_reference?.trim() || `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        await conn.execute(
+          `INSERT INTO Payments (registration_id, amount, payment_method, payment_status, transaction_reference, paid_at)
+           VALUES (?, ?, ?, 'Success', ?, NOW())`,
+          [newRegId, entryFeeNum, payment_method.trim(), ref]
+        );
+      }
+
+      return newRegId;
     });
 
     res.status(201).json({
@@ -121,6 +145,7 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
     const userId = req.user?.user_id;
     const tournamentId = parseInt(req.body.tournament_id, 10);
     const teamId = parseInt(req.body.team_id, 10);
+    const { payment_method, transaction_reference } = req.body;
 
     if (!userId) {
       res.status(401).json({ success: false, message: 'Authentication required.' });
@@ -154,7 +179,7 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
 
       // 2. Lock and fetch tournament info & rules
       const [tournaments]: any = await conn.execute(
-        `SELECT t.tournament_id, t.status, t.registration_deadline, t.max_participants,
+        `SELECT t.tournament_id, t.title, t.status, t.entry_fee, t.registration_deadline, t.max_participants,
                 tr.participation_type, tr.team_size
          FROM Tournaments t
          LEFT JOIN TournamentRules tr ON tr.tournament_id = t.tournament_id
@@ -169,6 +194,7 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
       }
 
       const tourn = tournaments[0];
+      const entryFeeNum = parseFloat(tourn.entry_fee) || 0;
 
       // 3. Validate participation type
       if (tourn.participation_type !== 'Team') {
@@ -224,6 +250,17 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
             'UPDATE Registrations SET status = ?, registration_date = NOW() WHERE registration_id = ?',
             ['Pending', prev.registration_id]
           );
+
+          // If entry fee > 0 and payment method provided, record payment atomically
+          if (entryFeeNum > 0 && payment_method) {
+            const ref = transaction_reference?.trim() || `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            await conn.execute(
+              `INSERT INTO Payments (registration_id, amount, payment_method, payment_status, transaction_reference, paid_at)
+               VALUES (?, ?, ?, 'Success', ?, NOW())`,
+              [prev.registration_id, entryFeeNum, payment_method.trim(), ref]
+            );
+          }
+
           return prev.registration_id;
         }
       }
@@ -247,8 +284,19 @@ export async function registerTeam(req: AuthenticatedRequest, res: Response, nex
         'INSERT INTO Registrations (tournament_id, user_id, team_id, status, registration_date) VALUES (?, NULL, ?, ?, NOW())',
         [tournamentId, teamId, 'Pending']
       );
+      const newRegId = insertResult.insertId;
 
-      return insertResult.insertId;
+      // If entry fee > 0 and payment method provided, record payment atomically
+      if (entryFeeNum > 0 && payment_method) {
+        const ref = transaction_reference?.trim() || `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        await conn.execute(
+          `INSERT INTO Payments (registration_id, amount, payment_method, payment_status, transaction_reference, paid_at)
+           VALUES (?, ?, ?, 'Success', ?, NOW())`,
+          [newRegId, entryFeeNum, payment_method.trim(), ref]
+        );
+      }
+
+      return newRegId;
     });
 
     res.status(201).json({
@@ -277,7 +325,10 @@ export async function getMyRegistrations(req: AuthenticatedRequest, res: Respons
              tr.participation_type,
              tm.team_name,
              cap.username AS captain_username,
-             (r.user_id = ? OR tm.captain_id = ?) AS can_cancel
+             (r.user_id = ? OR tm.captain_id = ?) AS can_cancel,
+             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_status,
+             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_reference,
+             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS paid_amount
       FROM Registrations r
       JOIN Tournaments t ON t.tournament_id = r.tournament_id
       JOIN Games g ON g.game_id = t.game_id
@@ -307,11 +358,14 @@ export async function listAllRegistrations(req: AuthenticatedRequest, res: Respo
 
     let sql = `
       SELECT r.registration_id, r.tournament_id, r.user_id, r.team_id, r.registration_date, r.status,
-             t.title AS tournament_title, t.format, t.status AS tournament_status,
+             t.title AS tournament_title, t.format, t.status AS tournament_status, t.entry_fee,
              g.game_name,
              tr.participation_type,
              u.username AS player_username, u.email AS player_email, u.country AS player_country,
-             tm.team_name, cap.username AS captain_username
+             tm.team_name, cap.username AS captain_username,
+             (SELECT p.payment_status FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_status,
+             (SELECT p.transaction_reference FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS payment_reference,
+             (SELECT p.amount FROM Payments p WHERE p.registration_id = r.registration_id AND p.payment_status = 'Success' LIMIT 1) AS paid_amount
       FROM Registrations r
       JOIN Tournaments t ON t.tournament_id = r.tournament_id
       JOIN Games g ON g.game_id = t.game_id
@@ -356,7 +410,7 @@ export async function listAllRegistrations(req: AuthenticatedRequest, res: Respo
 export async function updateRegistrationStatus(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const registrationId = parseInt(req.params.id as string, 10);
-    const { status } = req.body;
+    const { status, waive_fee } = req.body;
 
     const allowed: RegistrationStatus[] = ['Pending', 'Approved', 'Rejected', 'Cancelled'];
     if (!allowed.includes(status)) {
@@ -370,19 +424,45 @@ export async function updateRegistrationStatus(req: AuthenticatedRequest, res: R
       return;
     }
 
+    const tournamentId = reg[0].tournament_id;
+    const tourn = await query<any[]>(
+      'SELECT tournament_id, title, entry_fee, max_participants FROM Tournaments WHERE tournament_id = ?',
+      [tournamentId]
+    );
+
+    if (tourn.length === 0) {
+      res.status(404).json({ success: false, message: 'Tournament not found.' });
+      return;
+    }
+
+    const entryFee = parseFloat(tourn[0].entry_fee) || 0;
+
+    // If approving, verify entry fee payment has been made (unless administrator explicitly waives fee)
+    if (status === 'Approved' && entryFee > 0 && !waive_fee) {
+      const payments = await query<any[]>(
+        "SELECT payment_id, amount, payment_status, transaction_reference FROM Payments WHERE registration_id = ? AND payment_status = 'Success'",
+        [registrationId]
+      );
+
+      if (payments.length === 0) {
+        res.status(400).json({
+          success: false,
+          requires_payment: true,
+          entry_fee: entryFee,
+          message: `Cannot approve registration: Required entry fee of ₹${entryFee.toLocaleString('en-IN')} has not been paid. Entrant must pay or administrator must explicitly waive fee.`
+        });
+        return;
+      }
+    }
+
     // If approving, check if tournament limit has been reached
     if (status === 'Approved') {
-      const tournamentId = reg[0].tournament_id;
-      const tourn = await query<any[]>(
-        'SELECT max_participants FROM Tournaments WHERE tournament_id = ?',
-        [tournamentId]
-      );
       const approvedCount = await query<any[]>(
         "SELECT COUNT(*) AS count FROM Registrations WHERE tournament_id = ? AND status = 'Approved'",
         [tournamentId]
       );
 
-      if (tourn.length > 0 && approvedCount[0].count >= tourn[0].max_participants) {
+      if (approvedCount[0].count >= tourn[0].max_participants) {
         res.status(400).json({
           success: false,
           message: 'Cannot approve: Tournament max participant limit has already been reached.'

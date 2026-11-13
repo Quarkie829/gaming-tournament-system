@@ -4,6 +4,7 @@ import { registrationsApi } from '../../api/registrationsApi';
 import { tournamentsApi } from '../../api/tournamentsApi';
 import { Registration, Tournament } from '../../types';
 import { StatusBadge } from '../../components/StatusBadge';
+import { formatINR } from '../../utils/currency';
 import {
   CheckCircle,
   XCircle,
@@ -14,7 +15,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Calendar,
-  Clock
+  Clock,
+  CreditCard
 } from 'lucide-react';
 
 export const AdminRegistrationsPage: React.FC = () => {
@@ -54,11 +56,26 @@ export const AdminRegistrationsPage: React.FC = () => {
     fetchRegistrationsAndTournaments();
   }, [selectedTournament, selectedStatus, selectedType]);
 
-  const handleUpdateStatus = async (regId: number, newStatus: string) => {
+  const handleUpdateStatus = async (reg: Registration, newStatus: string, waiveFee: boolean = false) => {
     try {
       setActionLoading(true);
       setFeedback(null);
-      const res = await registrationsApi.updateStatus(regId, newStatus);
+
+      const fee = Number(reg.entry_fee) || 0;
+      const isUnpaid = fee > 0 && reg.payment_status !== 'Success';
+
+      if (newStatus === 'Approved' && isUnpaid && !waiveFee) {
+        const confirmWaive = window.confirm(
+          `PAYMENT WARNING:\n\nThis entrant has NOT paid the required entry fee of ${formatINR(fee)}.\n\nDo you want to explicitly WAIVE the entry fee and approve this registration?\n\nClick "OK" to waive fee and approve, or "Cancel" to abort.`
+        );
+        if (!confirmWaive) {
+          setActionLoading(false);
+          return;
+        }
+        waiveFee = true;
+      }
+
+      const res = await registrationsApi.updateStatus(reg.registration_id, newStatus, { waive_fee: waiveFee });
       setFeedback({ type: 'success', text: res.message });
       await fetchRegistrationsAndTournaments();
     } catch (err: any) {
@@ -180,6 +197,7 @@ export const AdminRegistrationsPage: React.FC = () => {
                   <th className="px-4 py-3 rounded-l-lg">Reg ID</th>
                   <th className="px-4 py-3">Tournament</th>
                   <th className="px-4 py-3">Entrant (Solo / Team)</th>
+                  <th className="px-4 py-3">Fee & Payment</th>
                   <th className="px-4 py-3">Submission Date</th>
                   <th className="px-4 py-3">Current Status</th>
                   <th className="px-4 py-3 rounded-r-lg text-right">Review Action</th>
@@ -188,6 +206,9 @@ export const AdminRegistrationsPage: React.FC = () => {
               <tbody className="divide-y divide-slate-800 text-slate-300">
                 {registrations.map((r) => {
                   const isSolo = r.user_id !== null;
+                  const fee = Number(r.entry_fee) || 0;
+                  const isPaid = fee > 0 && r.payment_status === 'Success';
+                  const isUnpaid = fee > 0 && !isPaid;
 
                   return (
                     <tr key={r.registration_id} className="hover:bg-slate-800/40 transition-colors">
@@ -221,6 +242,35 @@ export const AdminRegistrationsPage: React.FC = () => {
                           </div>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {fee === 0 ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                            Free Entry (₹0)
+                          </span>
+                        ) : isPaid ? (
+                          <div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1 w-fit">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Paid: {formatINR(r.paid_amount || fee)}</span>
+                            </span>
+                            {r.payment_reference && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[130px]" title={r.payment_reference}>
+                                Ref: {r.payment_reference}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-950/70 text-rose-300 border border-rose-500/30 flex items-center space-x-1 w-fit">
+                              <AlertCircle className="w-3 h-3 text-rose-400" />
+                              <span>UNPAID: {formatINR(fee)} Due</span>
+                            </span>
+                            <span className="text-[10px] text-rose-400/80 block mt-0.5">
+                              Payment pending
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-mono text-slate-400">
                         {new Date(r.registration_date).toLocaleString()}
                       </td>
@@ -231,17 +281,26 @@ export const AdminRegistrationsPage: React.FC = () => {
                         <div className="flex items-center justify-end space-x-1.5">
                           {r.status !== 'Approved' && (
                             <button
-                              onClick={() => handleUpdateStatus(r.registration_id, 'Approved')}
+                              onClick={() => handleUpdateStatus(r, 'Approved')}
                               disabled={actionLoading}
-                              className="px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 transition-colors"
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                isUnpaid
+                                  ? 'text-amber-300 hover:text-white bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40'
+                                  : 'text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40'
+                              }`}
+                              title={
+                                isUnpaid
+                                  ? 'Fee unpaid: Approval requires fee waiver confirmation'
+                                  : 'Approve registration'
+                              }
                             >
-                              Approve
+                              {isUnpaid ? 'Approve (Waive)' : 'Approve'}
                             </button>
                           )}
 
                           {r.status !== 'Rejected' && (
                             <button
-                              onClick={() => handleUpdateStatus(r.registration_id, 'Rejected')}
+                              onClick={() => handleUpdateStatus(r, 'Rejected')}
                               disabled={actionLoading}
                               className="px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 transition-colors"
                             >
@@ -251,7 +310,7 @@ export const AdminRegistrationsPage: React.FC = () => {
 
                           {r.status !== 'Pending' && (
                             <button
-                              onClick={() => handleUpdateStatus(r.registration_id, 'Pending')}
+                              onClick={() => handleUpdateStatus(r, 'Pending')}
                               disabled={actionLoading}
                               className="px-2 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
                               title="Reset to Pending"

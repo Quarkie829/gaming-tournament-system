@@ -167,11 +167,21 @@ describe('Module 4: Registration Management & Constraint Tests', () => {
     expect(res.status).toBe(403);
   });
 
-  it('should allow admin to review and approve a registration', async () => {
-    const res = await request(app)
+  it('should enforce payment check when approving registration with entry fee', async () => {
+    // Attempting to approve without payment or fee waiver should fail (400)
+    const failRes = await request(app)
       .patch(`/api/registrations/${soloRegId}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ status: 'Approved' });
+
+    expect(failRes.status).toBe(400);
+    expect(failRes.body.requires_payment).toBe(true);
+
+    // Approving with explicit waive_fee: true should succeed
+    const res = await request(app)
+      .patch(`/api/registrations/${soloRegId}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'Approved', waive_fee: true });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);

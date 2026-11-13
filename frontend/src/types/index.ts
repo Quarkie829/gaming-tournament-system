@@ -197,6 +197,9 @@ export interface Registration {
   captain_username?: string;
   captain_name?: string;
   can_cancel?: boolean;
+  payment_status?: string;
+  payment_reference?: string;
+  paid_amount?: number;
 }
 
 export interface UserEligibility {

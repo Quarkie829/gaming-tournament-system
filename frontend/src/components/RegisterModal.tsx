@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Tournament, UserEligibility } from '../types';
 import { registrationsApi } from '../api/registrationsApi';
-import { X, ShieldAlert, CheckCircle2, Users, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { X, ShieldAlert, CheckCircle2, Users, User, ArrowRight, AlertCircle, CreditCard, RefreshCw, IndianRupee } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../utils/currency';
 
@@ -25,6 +25,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Payment states for entry fee
+  const entryFee = Number(tournament.entry_fee) || 0;
+  const isPaid = entryFee > 0;
+  const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
+  const [transactionRef, setTransactionRef] = useState<string>(() => `UPI-INR-${Date.now().toString().slice(-6)}`);
+
+  const regenerateRef = () => {
+    setTransactionRef(`UPI-INR-${Date.now().toString().slice(-6)}`);
+  };
+
   if (!isOpen) return null;
 
   const isSolo = tournament.participation_type === 'Solo';
@@ -34,7 +44,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const res = await registrationsApi.registerSolo(tournament.tournament_id);
+      const paymentPayload = isPaid
+        ? { payment_method: paymentMethod, transaction_reference: transactionRef.trim() || undefined }
+        : undefined;
+      const res = await registrationsApi.registerSolo(tournament.tournament_id, paymentPayload);
       setSuccessMsg(res.message);
       setTimeout(() => {
         onSuccess();
@@ -56,7 +69,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const res = await registrationsApi.registerTeam(tournament.tournament_id, Number(selectedTeamId));
+      const paymentPayload = isPaid
+        ? { payment_method: paymentMethod, transaction_reference: transactionRef.trim() || undefined }
+        : undefined;
+      const res = await registrationsApi.registerTeam(tournament.tournament_id, Number(selectedTeamId), paymentPayload);
       setSuccessMsg(res.message);
       setTimeout(() => {
         onSuccess();
@@ -71,7 +87,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl p-6 sm:p-8 overflow-hidden">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl p-6 sm:p-8">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -117,7 +133,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Entry Fee:</span>
                 <span className="font-semibold text-emerald-400">
-                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : formatINR(tournament.entry_fee)}
+                  {entryFee === 0 ? 'FREE ENTRY' : formatINR(entryFee)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -128,17 +144,84 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
             </div>
 
+            {/* If paid tournament, display mandatory payment fields */}
+            {isPaid && (
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-blue-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-xs font-bold text-white">
+                    <CreditCard className="w-4 h-4 text-blue-400" />
+                    <span>Payment Details (Required Fee: {formatINR(entryFee)})</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/40 text-blue-300">
+                    INR (₹)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="UPI">UPI (Google Pay, PhonePe, Paytm, BHIM)</option>
+                    <option value="Net Banking">Net Banking (SBI, HDFC, ICICI, Axis)</option>
+                    <option value="Debit Card">Debit Card (RuPay, Visa, Mastercard)</option>
+                    <option value="Credit Card">Credit Card</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                      Transaction / UTR Reference
+                    </label>
+                    <button
+                      type="button"
+                      onClick={regenerateRef}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center space-x-1"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>Refresh Ref</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={transactionRef}
+                    onChange={(e) => setTransactionRef(e.target.value)}
+                    placeholder="e.g. UPI-INR-123456"
+                    className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Payment receipt will be recorded and attached to your registration in MySQL.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <p className="text-xs text-slate-400 leading-relaxed">
               By confirming, your registration will be placed in <strong>Pending</strong> status for administrator review.
-              Per database integrity constraints, your profile will be registered exclusively for slot allocation.
+              {isPaid
+                ? ' Your entry fee payment will be verified so that administrators can approve your slot.'
+                : ' Per database integrity constraints, your profile will be registered exclusively for slot allocation.'}
             </p>
 
             <button
               onClick={handleRegisterSolo}
               disabled={loading || !!successMsg}
-              className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all shadow-lg shadow-blue-600/20"
+              className={`w-full py-3 rounded-xl font-semibold text-sm text-white transition-all shadow-lg ${
+                isPaid
+                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
+              } disabled:opacity-50`}
             >
-              {loading ? 'Submitting Registration...' : 'Confirm Solo Registration'}
+              {loading
+                ? 'Processing...'
+                : isPaid
+                ? `Pay ${formatINR(entryFee)} & Submit Registration`
+                : 'Confirm Free Solo Registration'}
             </button>
           </div>
         ) : (
@@ -151,7 +234,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Entry Fee (Per Team):</span>
                 <span className="font-semibold text-emerald-400">
-                  {Number(tournament.entry_fee) === 0 ? 'FREE ENTRY' : formatINR(tournament.entry_fee)}
+                  {entryFee === 0 ? 'FREE ENTRY' : formatINR(entryFee)}
                 </span>
               </div>
             </div>
@@ -174,7 +257,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                   Select Captained Team
                 </label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {teams.map((t) => {
                     const meetsSize = t.meets_size_requirement;
                     const isAlreadyReg = t.is_registered;
@@ -227,12 +310,74 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   })}
                 </div>
 
+                {/* If paid tournament, display mandatory payment fields */}
+                {isPaid && (
+                  <div className="mt-4 p-4 rounded-xl bg-slate-800/40 border border-blue-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-xs font-bold text-white">
+                        <CreditCard className="w-4 h-4 text-blue-400" />
+                        <span>Team Entry Fee ({formatINR(entryFee)})</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/40 text-blue-300">
+                        INR (₹)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                        Payment Method
+                      </label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="UPI">UPI (Google Pay, PhonePe, Paytm, BHIM)</option>
+                        <option value="Net Banking">Net Banking (SBI, HDFC, ICICI, Axis)</option>
+                        <option value="Debit Card">Debit Card (RuPay, Visa, Mastercard)</option>
+                        <option value="Credit Card">Credit Card</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                          Transaction / UTR Reference
+                        </label>
+                        <button
+                          type="button"
+                          onClick={regenerateRef}
+                          className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center space-x-1"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5" />
+                          <span>Refresh Ref</span>
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        placeholder="e.g. UPI-INR-123456"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={handleRegisterTeam}
                   disabled={loading || !selectedTeamId || !!successMsg}
-                  className="w-full mt-4 py-3 rounded-xl font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all shadow-lg shadow-blue-600/20"
+                  className={`w-full mt-4 py-3 rounded-xl font-semibold text-sm text-white transition-all shadow-lg ${
+                    isPaid
+                      ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                      : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
+                  } disabled:opacity-50`}
                 >
-                  {loading ? 'Submitting Team...' : 'Confirm Team Registration'}
+                  {loading
+                    ? 'Processing...'
+                    : isPaid
+                    ? `Pay ${formatINR(entryFee)} & Register Team`
+                    : 'Confirm Free Team Registration'}
                 </button>
               </div>
             )}

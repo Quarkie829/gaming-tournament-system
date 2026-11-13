@@ -77,6 +77,10 @@ export interface Team {
 export interface TeamMember {
   team_id: number;
   user_id: number;
+  entry_fee?: number;
+  payment_status?: string;
+  payment_reference?: string;
+  paid_amount?: number;
   username?: string;
   email?: string;
   country?: string;
@@ -99,6 +103,10 @@ export interface Registration {
   game_name?: string;
   format?: string;
   participation_type?: ParticipationType;
+  entry_fee?: number;
+  payment_status?: string;
+  payment_reference?: string;
+  paid_amount?: number;
   username?: string;
   user_email?: string;
   team_name?: string;
@@ -127,6 +135,10 @@ export interface MatchParticipantDetail {
   slot_number: number;
   user_id?: number | null;
   team_id?: number | null;
+  entry_fee?: number;
+  payment_status?: string;
+  payment_reference?: string;
+  paid_amount?: number;
   username?: string;
   team_name?: string;
   entrant_name?: string;
